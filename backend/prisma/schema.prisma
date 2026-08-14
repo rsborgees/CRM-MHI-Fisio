@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model agendamentos {
+  id                 Int            @id @default(autoincrement())
+  cliente_id         Int
+  profissional_id    Int?
+  servico_id         Int?
+  pacote_id          Int?
+  data_hora          DateTime       @db.Timestamp(6)
+  duracao_minutos    Int?
+  status             String         @default("agendado") @db.VarChar(30)
+  valor              Decimal?       @db.Decimal(12, 2)
+  origem_agendamento String?        @db.VarChar(50)
+  observacoes        String?
+  created_at         DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?      @default(now()) @db.Timestamp(6)
+  clientes           clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pacotes            pacotes?       @relation(fields: [pacote_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profissionais      profissionais? @relation(fields: [profissional_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  servicos           servicos?      @relation(fields: [servico_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  avaliacoes         avaliacoes[]
+  pagamentos         pagamentos[]
+}
+
+model avaliacoes {
+  id             Int            @id @default(autoincrement())
+  cliente_id     Int
+  agendamento_id Int?
+  data           DateTime       @default(now()) @db.Timestamp(6)
+  peso           Decimal?       @db.Decimal(6, 2)
+  altura         Decimal?       @db.Decimal(6, 2)
+  imc            Decimal?       @db.Decimal(6, 2)
+  medidas        Json?
+  obs_pele       String?
+  obs_corporal   String?
+  recomendacoes  String?
+  responsavel_id Int?
+  agendamentos   agendamentos?  @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes       clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profissionais  profissionais? @relation(fields: [responsavel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model clientes {
+  id                 Int                  @id @default(autoincrement())
+  nome               String               @db.VarChar(200)
+  cpf_cnpj           String?              @db.VarChar(20)
+  data_nascimento    DateTime?            @db.Date
+  sexo               String?              @db.VarChar(10)
+  telefone           String?              @db.VarChar(30)
+  celular            String?              @db.VarChar(30)
+  email              String?              @db.VarChar(150)
+  endereco           String?
+  cidade             String?              @db.VarChar(100)
+  estado             String?              @db.VarChar(50)
+  cep                String?              @db.VarChar(20)
+  data_cadastro      DateTime?            @default(now()) @db.Timestamp(6)
+  origem             String?              @db.VarChar(100)
+  status             String?              @default("ativo") @db.VarChar(20)
+  observacoes        String?
+  agendamentos       agendamentos[]
+  avaliacoes         avaliacoes[]
+  conversas_whatsapp conversas_whatsapp[]
+  historico_clientes historico_clientes[]
+  pagamentos         pagamentos[]
+}
+
+model conversas_whatsapp {
+  id            Int      @id @default(autoincrement())
+  cliente_id    Int
+  telefone      String   @db.VarChar(30)
+  push_name     String?  @db.VarChar(150)
+  mensagens     Json
+  pausado       Boolean  @default(false)
+  atualizado_em DateTime @default(now()) @updatedAt
+  clientes      clientes @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model configuracao_agente {
+  id                Int      @id @default(autoincrement())
+  instrucao_sistema String
+  atualizado_em     DateTime @default(now()) @updatedAt
+}
+
+model historico_clientes {
+  id             Int      @id @default(autoincrement())
+  cliente_id     Int
+  data           DateTime @default(now()) @db.Timestamp(6)
+  tipo           String?  @db.VarChar(50)
+  descricao      String?
+  responsavel_id Int?
+  clientes       clientes @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model pacotes {
+  id            Int            @id @default(autoincrement())
+  nome          String         @db.VarChar(150)
+  descricao     String?
+  preco         Decimal?       @db.Decimal(12, 2)
+  validade_dias Int?
+  ativo         Boolean?       @default(true)
+  agendamentos  agendamentos[]
+  pagamentos    pagamentos[]
+}
+
+model pagamentos {
+  id              Int           @id @default(autoincrement())
+  cliente_id      Int
+  agendamento_id  Int?
+  pacote_id       Int?
+  data_pagamento  DateTime      @default(now()) @db.Timestamp(6)
+  valor           Decimal       @db.Decimal(12, 2)
+  forma_pagamento String?       @db.VarChar(50)
+  status          String?       @default("pago") @db.VarChar(30)
+  observacoes     String?
+  agendamentos    agendamentos? @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes        clientes      @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pacotes         pacotes?      @relation(fields: [pacote_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model profissionais {
+  id            Int            @id @default(autoincrement())
+  nome          String         @db.VarChar(200)
+  especialidade String?        @db.VarChar(100)
+  telefone      String?        @db.VarChar(30)
+  email         String?        @db.VarChar(150)
+  observacoes   String?
+  ativo         Boolean?       @default(true)
+  agendamentos  agendamentos[]
+  avaliacoes    avaliacoes[]
+}
+
+model usuarios {
+  id         Int      @id @default(autoincrement())
+  nome       String   @db.VarChar(200)
+  email      String   @unique @db.VarChar(150)
+  senha_hash String   @db.VarChar(255)
+  ativo      Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+}
+
+model servicos {
+  id              Int            @id @default(autoincrement())
+  nome            String         @db.VarChar(150)
+  descricao       String?
+  duracao_minutos Int?
+  preco           Decimal?       @db.Decimal(12, 2)
+  categoria       String?        @db.VarChar(100)
+  ativo           Boolean?       @default(true)
+  agendamentos    agendamentos[]
+}

@@ -1,0 +1,88 @@
+.voltar-link {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--color-muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.voltar-link:hover {
+  color: var(--color-gold);
+}
+
+.perfil-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+
+.perfil-dados {
+  display: flex;
+  gap: 20px;
+  margin: 8px 0 28px;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.perfil-secao {
+  margin-bottom: 32px;
+}
+
+.perfil-secao h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.perfil-historico-form {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.perfil-historico-form .input-field:first-child {
+  flex: 0 0 220px;
+}
+
+.perfil-historico-form .input-field:nth-child(2) {
+  flex: 1;
+}
+
+.perfil-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.perfil-timeline li {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-gold);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.perfil-timeline-data {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-right: 10px;
+}
+
+.perfil-timeline-tipo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-gold);
+  text-transform: uppercase;
+}
+
+.perfil-timeline p {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+
+.perfil-secao .chat-whatsapp {
+  max-height: 420px;
+}

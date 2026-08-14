@@ -1,0 +1,32 @@
+.config-explicacao {
+  color: var(--color-muted);
+  font-size: 14px;
+  max-width: 640px;
+  margin: 0 0 20px;
+}
+
+.config-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.config-textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.config-acoes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.config-mensagem {
+  font-size: 14px;
+  color: var(--color-gold-hover);
+}

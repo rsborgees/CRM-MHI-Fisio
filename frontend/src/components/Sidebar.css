@@ -1,0 +1,106 @@
+.sidebar {
+  width: 72px;
+  flex-shrink: 0;
+  min-height: 100svh;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.sidebar-brand {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-brand .brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-gold);
+  color: var(--color-on-gold);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  width: 100%;
+  align-items: center;
+}
+
+.sidebar-link,
+.sidebar-logout {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  color: var(--color-muted);
+  text-decoration: none;
+  background: none;
+  border: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-link:hover,
+.sidebar-logout:hover {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.sidebar-link.active {
+  background: rgba(199, 165, 74, 0.15);
+  color: var(--color-foreground);
+}
+
+.sidebar-logout {
+  margin-bottom: 4px;
+}
+
+.sidebar-logout:hover {
+  color: var(--color-destructive);
+}
+
+.sidebar-tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: var(--color-foreground);
+  color: var(--color-surface);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 6px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+  z-index: 20;
+}
+
+.sidebar-link:hover .sidebar-tooltip,
+.sidebar-link:focus-visible .sidebar-tooltip,
+.sidebar-logout:hover .sidebar-tooltip,
+.sidebar-logout:focus-visible .sidebar-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}

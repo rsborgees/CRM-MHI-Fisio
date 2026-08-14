@@ -1,0 +1,136 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
+:root {
+  /* Paleta branco + dourado do site */
+  --color-background: #fafaf9;
+  --color-surface: #ffffff;
+  --color-foreground: #1c1917;
+  --color-muted: #78716c;
+  --color-border: #e7e3de;
+  --color-gold: #c7a54a;
+  --color-gold-hover: #b3903a;
+  --color-on-gold: #1c1917;
+  --color-destructive: #dc2626;
+
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  --shadow-card: 0 10px 30px -10px rgba(28, 25, 23, 0.15);
+
+  color-scheme: light;
+  font: 16px/1.5 var(--font-body);
+  color: var(--color-foreground);
+  background: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  margin: 0;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+input {
+  font-family: var(--font-body);
+  font-size: 16px;
+}
+
+.btn-primary {
+  background: var(--color-gold);
+  color: var(--color-on-gold);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.btn-primary:hover {
+  background: var(--color-gold-hover);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.btn-secondary:hover {
+  background: var(--color-background);
+  border-color: var(--color-gold);
+}
+
+.btn-danger {
+  background: var(--color-surface);
+  color: var(--color-destructive);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.btn-danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--color-destructive);
+}
+
+.input-field {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.input-field:focus-visible {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(199, 165, 74, 0.25);
+}
+
+.input-field::placeholder {
+  color: var(--color-muted);
+}
