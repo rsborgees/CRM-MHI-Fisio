@@ -5,7 +5,7 @@ import { AppError } from "../../utils/AppError.js";
 const router = Router();
 
 function validarToken(req, res, next) {
-  if (req.query.token !== process.env.ZAPI_WEBHOOK_TOKEN) {
+  if (req.query.token !== process.env.WEBHOOK_TOKEN) {
     throw new AppError("Token inválido", 401);
   }
   next();

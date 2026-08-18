@@ -39,6 +39,41 @@ function montarMensagens(mensagens, chamadasAnteriores, instrucaoSistema) {
   return resultado;
 }
 
+function extrairJsonEmbutido(texto) {
+  if (!texto) return null;
+
+  const inicio = texto.indexOf("{");
+  const fim = texto.lastIndexOf("}");
+  if (inicio === -1 || fim === -1 || fim <= inicio) return null;
+
+  try {
+    return { corpo: JSON.parse(texto.slice(inicio, fim + 1)), inicio };
+  } catch {
+    return null;
+  }
+}
+
+function extrairChamadaEmbutidaNoTexto(texto, ferramentas) {
+  const encontrado = extrairJsonEmbutido(texto);
+  if (!encontrado?.corpo?.name || !ferramentas.some((ferramenta) => ferramenta.nome === encontrado.corpo.name)) {
+    return null;
+  }
+
+  return {
+    id: `sintetico-${Math.random().toString(36).slice(2, 10)}`,
+    nome: encontrado.corpo.name,
+    argumentos: encontrado.corpo.arguments ?? encontrado.corpo.parameters ?? {},
+  };
+}
+
+// Defesa extra: mesmo quando o JSON solto não corresponde a nenhuma ferramenta conhecida
+// (nome inventado, chamada malformada), ele nunca deve vazar pro cliente como texto cru.
+function removerJsonEmbutidoDoTexto(texto) {
+  const encontrado = extrairJsonEmbutido(texto);
+  if (!encontrado?.corpo?.name) return texto;
+  return texto.slice(0, encontrado.inicio).trim();
+}
+
 export async function gerarResposta({ mensagens, ferramentas, chamadasAnteriores = [], instrucaoSistema }) {
   const tools = ferramentas.map((ferramenta) => ({
     type: "function",
@@ -57,14 +92,24 @@ export async function gerarResposta({ mensagens, ferramentas, chamadasAnteriores
 
   const mensagemResposta = resposta.choices[0].message;
 
-  const chamadasDeFerramenta = (mensagemResposta.tool_calls ?? []).map((toolCall) => ({
+  let chamadasDeFerramenta = (mensagemResposta.tool_calls ?? []).map((toolCall) => ({
     id: toolCall.id,
     nome: toolCall.function.name,
     argumentos: JSON.parse(toolCall.function.arguments || "{}"),
   }));
 
+  if (chamadasDeFerramenta.length === 0) {
+    const chamadaEmbutida = extrairChamadaEmbutidaNoTexto(mensagemResposta.content, ferramentas);
+    if (chamadaEmbutida) {
+      chamadasDeFerramenta = [chamadaEmbutida];
+    }
+  }
+
   return {
-    texto: mensagemResposta.content ?? "",
+    texto:
+      chamadasDeFerramenta.length > 0
+        ? mensagemResposta.content ?? ""
+        : removerJsonEmbutidoDoTexto(mensagemResposta.content ?? ""),
     chamadasDeFerramenta,
   };
 }

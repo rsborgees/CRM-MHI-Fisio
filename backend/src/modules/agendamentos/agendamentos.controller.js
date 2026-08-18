@@ -2,8 +2,15 @@ import * as agendamentosService from "./agendamentos.service.js";
 import { criarAgendamentoSchema, atualizarAgendamentoSchema } from "./agendamentos.schema.js";
 
 export async function listar(req, res) {
-  const { data, profissional_id, cliente_id, status } = req.query;
-  const agendamentos = await agendamentosService.listar({ data, profissional_id, cliente_id, status });
+  const { data, data_inicio, data_fim, profissional_id, cliente_id, status } = req.query;
+  const agendamentos = await agendamentosService.listar({
+    data,
+    data_inicio,
+    data_fim,
+    profissional_id,
+    cliente_id,
+    status,
+  });
   res.json(agendamentos);
 }
 

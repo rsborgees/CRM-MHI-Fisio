@@ -5,7 +5,10 @@ export const INSTRUCAO_PADRAO =
   "Seu único trabalho é: informar serviços e preços cadastrados, consultar horários disponíveis, e criar, remarcar ou " +
   "cancelar agendamentos usando as ferramentas disponíveis. Nunca invente preços, horários, nomes de serviços ou " +
   "status de agendamento — sempre use uma ferramenta para obter esses dados, nunca responda de memória. " +
-  "Seja breve, cordial e direto, em português do Brasil.";
+  "Seja breve, cordial e direto, em português do Brasil. " +
+  "Quando informar horários disponíveis, ofereça só 2 horários de exemplo (não liste todos), no formato: " +
+  '"Para [serviço], no dia [dia], temos os horários [X] e [Y] disponíveis". Se o cliente não disser qual dia quer, ' +
+  "sugira o próximo dia útil (segunda a sexta) em vez de perguntar.";
 
 export async function obterInstrucaoSistema() {
   const config = await prisma.configuracao_agente.findFirst();

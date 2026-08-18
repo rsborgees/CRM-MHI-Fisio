@@ -1,3 +1,102 @@
-.agenda-date-picker {
-  width: auto;
+.agenda-navegacao-semana {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.agenda-intervalo-semana {
+  font-size: 14px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.agenda-quadro-semana {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(160px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.agenda-coluna-dia {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.agenda-coluna-cabecalho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px;
+}
+
+.agenda-coluna-nome-dia {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.agenda-coluna-data {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.agenda-coluna-vazia {
+  color: var(--color-muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.agenda-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.agenda-cartao-hora {
+  font-weight: 600;
+  color: var(--color-gold);
+}
+
+.agenda-cartao-cliente {
+  color: var(--color-foreground);
+}
+
+.agenda-cartao-servico {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.agenda-cartao-profissional {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.agenda-cartao-status {
+  margin-top: 4px;
+  width: 100%;
+}
+
+.agenda-cartao-acoes {
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+
+.agenda-cartao-acoes .btn-secondary,
+.agenda-cartao-acoes .btn-danger {
+  width: 28px;
+  height: 28px;
 }

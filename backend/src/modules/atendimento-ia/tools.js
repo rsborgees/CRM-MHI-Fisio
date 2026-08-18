@@ -1,10 +1,62 @@
 import * as clientesService from "../clientes/clientes.service.js";
 import * as servicosService from "../servicos/servicos.service.js";
+import * as profissionaisService from "../profissionais/profissionais.service.js";
 import * as agendamentosService from "../agendamentos/agendamentos.service.js";
 import { AppError } from "../../utils/AppError.js";
 
+const DIAS_DA_SEMANA = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+];
+
+const MAX_HORARIOS_SUGERIDOS = 2;
+const FUSO_HORARIO_CLINICA = "America/Sao_Paulo";
+
+// Converte um horário (armazenado em UTC no banco) pro fuso da clínica, explicitamente —
+// não depende do fuso configurado no servidor onde isso roda. Sem isso, a IA lê o número
+// da hora em UTC direto da string e fala como se já fosse hora local (ex: 11h UTC = 8h em SP).
+function paraDataHoraLocalISO(dataUTC) {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO_HORARIO_CLINICA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(dataUTC));
+
+  const valor = (tipo) => partes.find((parte) => parte.type === tipo).value;
+  return `${valor("year")}-${valor("month")}-${valor("day")}T${valor("hour")}:${valor("minute")}:00`;
+}
+
+function proximoDiaUtilISO() {
+  const data = new Date();
+  data.setDate(data.getDate() + 1);
+  while (data.getDay() === 0 || data.getDay() === 6) {
+    data.setDate(data.getDate() + 1);
+  }
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function formatarDataAtual() {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `Hoje é ${DIAS_DA_SEMANA[agora.getDay()]}, ${ano}-${mes}-${dia} (formato AAAA-MM-DD). Use esta data como referência para calcular "hoje", "amanhã", "essa semana" e datas relativas semelhantes — nunca use outra data como hoje.`;
+}
+
 export function gerarInstrucaoSistema({ instrucaoBase, resumoCliente, nome, primeiraMensagem }) {
-  let instrucao = instrucaoBase;
+  let instrucao = `${instrucaoBase}\n\n${formatarDataAtual()}`;
 
   if (resumoCliente) {
     instrucao += `\n\nContexto sobre este cliente (não repita isso literalmente pra ele, é só pra você se situar): ${resumoCliente}`;
@@ -13,10 +65,11 @@ export function gerarInstrucaoSistema({ instrucaoBase, resumoCliente, nome, prim
   if (primeiraMensagem) {
     instrucao +=
       ` O nome salvo para este contato é "${nome}", vindo do perfil do WhatsApp, e pode não ser o nome completo ` +
-      "real da pessoa. Nesta primeira mensagem da conversa, cumprimente o cliente e, se ele ainda não tiver dito o " +
-      "nome completo dele na própria mensagem, pergunte educadamente qual é antes de seguir com o atendimento. " +
-      "Assim que ele informar o nome (nesta mensagem ou numa próxima), chame a ferramenta atualizarNomeCliente com " +
-      "o nome completo pra salvar no cadastro — não pergunte de novo depois disso.";
+      "real da pessoa. Nesta primeira mensagem, cumprimente o cliente de forma natural e pergunte como pode ajudar — " +
+      "não peça o nome completo logo de cara, isso parece formulário de cadastro, não conversa. Só peça o nome " +
+      "completo mais pra frente, num momento natural (por exemplo ao confirmar um agendamento), nunca como a " +
+      "primeira pergunta. Quando ele informar o nome completo (nesta mensagem ou numa próxima), chame a ferramenta " +
+      "atualizarNomeCliente pra salvar no cadastro — não pergunte de novo depois disso.";
   }
 
   return instrucao;
@@ -31,15 +84,36 @@ export const DEFINICOES_FERRAMENTAS = [
   },
   {
     nome: "consultarHorariosDisponiveis",
-    descricao: "Lista horários disponíveis numa data específica, opcionalmente filtrando por serviço e profissional.",
+    descricao:
+      "Lista horários disponíveis, opcionalmente filtrando por data, serviço e profissional. Devolve só alguns " +
+      "horários de exemplo (não a lista completa) e o total de horários livres naquele dia. Os horários já vêm " +
+      "no horário local da clínica, prontos para copiar direto no data_hora de criarAgendamento — não precisa " +
+      "converter fuso horário.",
     parametros: {
       type: "object",
       properties: {
-        data: { type: "string", description: "data no formato AAAA-MM-DD" },
-        servico_id: { type: "number", description: "id do serviço desejado, se já escolhido" },
-        profissional_id: { type: "number", description: "id do profissional desejado, se já escolhido" },
+        data: {
+          type: "string",
+          description:
+            "data no formato AAAA-MM-DD, se o cliente já disse qual dia quer. Deixe em branco se o cliente não " +
+            "especificou — o sistema sugere automaticamente o próximo dia útil.",
+        },
+        nome_servico: {
+          type: "string",
+          description: "nome exato do serviço desejado (use o nome retornado por consultarServicosPrecos), se já escolhido",
+        },
+        nome_profissional: {
+          type: "string",
+          description: "nome exato do profissional desejado, se já escolhido",
+        },
+        hora_especifica: {
+          type: "string",
+          description:
+            "se o cliente já pediu um horário exato (formato HH:mm), informe aqui pra confirmar diretamente se " +
+            "ESSE horário está disponível — nunca conclua que não está só porque ele não apareceu nos exemplos " +
+            "de 'horarios' retornados (esses são só alguns exemplos, não a lista completa).",
+        },
       },
-      required: ["data"],
     },
   },
   {
@@ -48,32 +122,56 @@ export const DEFINICOES_FERRAMENTAS = [
     parametros: {
       type: "object",
       properties: {
-        servico_id: { type: "number" },
-        profissional_id: { type: "number" },
+        nome_servico: {
+          type: "string",
+          description: "nome exato do serviço (use o nome retornado por consultarServicosPrecos, nunca um id)",
+        },
+        nome_profissional: {
+          type: "string",
+          description:
+            "nome exato do profissional, só se o cliente já escolheu uma. Pode deixar em branco — o sistema " +
+            "escolhe automaticamente quando só uma profissional atende o serviço, ou avisa se precisar perguntar " +
+            "a preferência do cliente.",
+        },
         data_hora: { type: "string", description: "data e hora no formato AAAA-MM-DDTHH:mm:00" },
+      },
+      required: ["nome_servico", "data_hora"],
+    },
+  },
+  {
+    nome: "remarcarAgendamento",
+    descricao:
+      "Muda a data/hora de um agendamento existente e ativo do cliente desta conversa. Nunca peça ou use um id " +
+      "numérico de agendamento — o cliente não sabe esse número. Use o nome do serviço pra identificar qual agendamento.",
+    parametros: {
+      type: "object",
+      properties: {
+        nome_servico: {
+          type: "string",
+          description:
+            "nome do serviço do agendamento que o cliente quer remarcar — obrigatório se ele tiver mais de um " +
+            "agendamento ativo, opcional se só tiver um",
+        },
+        data_hora: { type: "string", description: "nova data e hora no formato AAAA-MM-DDTHH:mm:00" },
       },
       required: ["data_hora"],
     },
   },
   {
-    nome: "remarcarAgendamento",
-    descricao: "Muda a data/hora de um agendamento existente do cliente desta conversa.",
+    nome: "cancelarAgendamento",
+    descricao:
+      "Cancela um agendamento existente e ativo do cliente desta conversa. Nunca peça ou use um id numérico de " +
+      "agendamento — o cliente não sabe esse número. Use o nome do serviço pra identificar qual agendamento.",
     parametros: {
       type: "object",
       properties: {
-        agendamento_id: { type: "number" },
-        data_hora: { type: "string" },
+        nome_servico: {
+          type: "string",
+          description:
+            "nome do serviço do agendamento que o cliente quer cancelar — obrigatório se ele tiver mais de um " +
+            "agendamento ativo, opcional se só tiver um",
+        },
       },
-      required: ["agendamento_id", "data_hora"],
-    },
-  },
-  {
-    nome: "cancelarAgendamento",
-    descricao: "Cancela um agendamento existente do cliente desta conversa.",
-    parametros: {
-      type: "object",
-      properties: { agendamento_id: { type: "number" } },
-      required: ["agendamento_id"],
     },
   },
   {
@@ -94,6 +192,55 @@ export const DEFINICOES_FERRAMENTAS = [
   },
 ];
 
+async function resolverServicoPorNome(nomeServico) {
+  if (!nomeServico) return null;
+
+  const [servico] = await servicosService.listar({ busca: nomeServico, ativo: "true" });
+  if (!servico) {
+    const todos = await servicosService.listar({ ativo: "true" });
+    throw new AppError(
+      `Serviço "${nomeServico}" não encontrado. Serviços disponíveis: ${todos.map((s) => s.nome).join(", ")}.`,
+      404,
+    );
+  }
+  return servico;
+}
+
+async function resolverProfissionalPorNome(nomeProfissional) {
+  if (!nomeProfissional) return null;
+
+  const [profissional] = await profissionaisService.listar({ busca: nomeProfissional, ativo: "true" });
+  if (!profissional) {
+    const todos = await profissionaisService.listar({ ativo: "true" });
+    throw new AppError(
+      `Profissional "${nomeProfissional}" não encontrado. Profissionais disponíveis: ${todos.map((p) => p.nome).join(", ")}.`,
+      404,
+    );
+  }
+  return profissional;
+}
+
+async function profissionaisQueAtendemServico(servicoId) {
+  const todos = await profissionaisService.listar({ ativo: "true" });
+  return todos.filter((profissional) => profissional.servicosAtendidos?.some((servico) => servico.id === servicoId));
+}
+
+// Resolve qual profissional vai atender o agendamento quando o cliente não nomeia uma: se só
+// uma profissional atende esse serviço, usa ela; se mais de uma atende, força a IA a perguntar
+// a preferência do cliente antes de agendar; se nenhuma está vinculada ainda, segue sem
+// profissional definida (recurso compartilhado da clínica, como já era antes dessa relação existir).
+async function resolverProfissionalPorServico(servico) {
+  const candidatas = await profissionaisQueAtendemServico(servico.id);
+  if (candidatas.length === 1) return candidatas[0];
+  if (candidatas.length > 1) {
+    throw new AppError(
+      `Mais de uma profissional atende ${servico.nome}. Pergunte ao cliente qual ele prefere: ${candidatas.map((p) => p.nome).join(", ")}.`,
+      400,
+    );
+  }
+  return null;
+}
+
 async function consultarServicosPrecos() {
   const servicos = await servicosService.listar({ ativo: "true" });
   return {
@@ -108,53 +255,159 @@ async function consultarServicosPrecos() {
   };
 }
 
+// Entre os horários disponíveis, prioriza os "redondos" (ex: 12:00) sobre os quebrados
+// (ex: 12:30) ao escolher os exemplos pra sugerir — fica mais natural pro cliente escolher.
+function escolherHorariosSugeridos(horarios) {
+  const redondos = horarios.filter((horario) => new Date(horario).getUTCMinutes() === 0);
+  const restantes = horarios.filter((horario) => !redondos.includes(horario));
+  return [...redondos, ...restantes].slice(0, MAX_HORARIOS_SUGERIDOS);
+}
+
 async function consultarHorariosDisponiveis(clienteId, argumentos) {
+  const servico = await resolverServicoPorNome(argumentos.nome_servico);
+  const profissional = await resolverProfissionalPorNome(argumentos.nome_profissional);
+  // Se o cliente não disse qual dia quer, sugere o próximo dia útil em vez de perguntar
+  // ou deixar o modelo inventar uma data.
+  const data = argumentos.data || proximoDiaUtilISO();
+
   const horarios = await agendamentosService.horariosDisponiveis({
-    servico_id: argumentos.servico_id,
-    profissional_id: argumentos.profissional_id,
-    data: argumentos.data,
+    servico_id: servico?.id,
+    profissional_id: profissional?.id,
+    data,
   });
-  return { horarios };
+
+  const resultado = {
+    data,
+    horarios: escolherHorariosSugeridos(horarios).map(paraDataHoraLocalISO),
+    total_disponivel: horarios.length,
+  };
+
+  // Sem isso, a IA só vê 2 exemplos e pode concluir errado que um horário específico que o
+  // cliente pediu está indisponível só por não estar entre os 2 — aqui ela confirma de verdade.
+  if (argumentos.hora_especifica) {
+    const horarioProcuradoISO = `${data}T${argumentos.hora_especifica}:00`;
+    resultado.horario_especifico_perguntado = horarioProcuradoISO;
+    resultado.horario_especifico_disponivel = horarios.some(
+      (horario) => paraDataHoraLocalISO(horario) === horarioProcuradoISO,
+    );
+  }
+
+  return resultado;
 }
 
 async function criarAgendamento(clienteId, argumentos) {
-  let duracao_minutos;
-  if (argumentos.servico_id) {
-    const servico = await servicosService.buscarPorId(Number(argumentos.servico_id));
-    duracao_minutos = servico.duracao_minutos;
+  // O schema já marca nome_servico como obrigatório, mas nem todo modelo respeita isso —
+  // sem essa checagem o agendamento é criado sem serviço vinculado (servico_id nulo).
+  if (!argumentos.nome_servico) {
+    throw new AppError("É necessário informar o nome do serviço para criar o agendamento.", 400);
+  }
+
+  // Cliente novo pelo WhatsApp entra com um nome provisório (ex: "Cliente WhatsApp 5511...")
+  // até informar o nome de verdade — não deixa agendar sem isso, mesmo que a IA "esqueça" de
+  // perguntar antes.
+  const cliente = await clientesService.buscarPorId(clienteId);
+  if (cliente.nome.startsWith("Cliente WhatsApp")) {
+    throw new AppError(
+      "Antes de criar o agendamento, pergunte o nome completo do cliente e chame atualizarNomeCliente para salvar.",
+      400,
+    );
+  }
+
+  const servico = await resolverServicoPorNome(argumentos.nome_servico);
+
+  let profissional;
+  if (argumentos.nome_profissional) {
+    profissional = await resolverProfissionalPorNome(argumentos.nome_profissional);
+    const atende = profissional.servicosAtendidos?.some((s) => s.id === servico.id);
+    if (!atende) {
+      const quemAtende = await profissionaisQueAtendemServico(servico.id);
+      throw new AppError(
+        quemAtende.length > 0
+          ? `${profissional.nome} não atende ${servico.nome}. Quem atende: ${quemAtende.map((p) => p.nome).join(", ")}.`
+          : `${profissional.nome} não atende ${servico.nome}, e nenhuma outra profissional está vinculada a esse serviço ainda.`,
+        400,
+      );
+    }
+  } else {
+    profissional = await resolverProfissionalPorServico(servico);
   }
 
   const agendamento = await agendamentosService.criar({
     cliente_id: clienteId,
-    servico_id: argumentos.servico_id,
-    profissional_id: argumentos.profissional_id,
+    servico_id: servico?.id,
+    profissional_id: profissional?.id,
     data_hora: new Date(argumentos.data_hora),
-    duracao_minutos,
+    duracao_minutos: servico?.duracao_minutos,
   });
 
-  return { id: agendamento.id, status: agendamento.status, data_hora: agendamento.data_hora };
+  return {
+    id: agendamento.id,
+    status: agendamento.status,
+    data_hora: agendamento.data_hora,
+    servico: servico?.nome ?? null,
+  };
 }
 
-async function buscarAgendamentoDoCliente(clienteId, agendamentoId) {
-  const agendamento = await agendamentosService.buscarPorId(Number(agendamentoId));
-  if (agendamento.cliente_id !== clienteId) {
-    throw new AppError("Agendamento não encontrado", 404);
+// Resolve qual agendamento o cliente quer mudar/cancelar pelo nome do serviço, nunca por id —
+// o cliente (e o modelo) não tem como saber um id numérico de agendamento. Como a busca já
+// parte da lista de agendamentos DESSE cliente, a propriedade fica garantida por construção.
+async function resolverAgendamentoDoClientePorServico(clienteId, nomeServico) {
+  const agendamentos = await agendamentosService.listar({ cliente_id: clienteId });
+  const ativos = agendamentos.filter((agendamento) => agendamento.status !== "cancelado");
+
+  function listarAtivos() {
+    return ativos
+      .map((agendamento) => `${agendamento.servicos?.nome ?? "serviço"} em ${paraDataHoraLocalISO(agendamento.data_hora)}`)
+      .join(", ");
   }
-  return agendamento;
+
+  if (ativos.length === 0) {
+    throw new AppError("Este cliente não tem nenhum agendamento ativo no momento.", 404);
+  }
+
+  const candidatos = nomeServico
+    ? ativos.filter((agendamento) => agendamento.servicos?.nome?.toLowerCase().includes(nomeServico.toLowerCase()))
+    : ativos;
+
+  if (candidatos.length === 0) {
+    throw new AppError(
+      `Não encontrei nenhum agendamento ativo para "${nomeServico}". Agendamentos ativos: ${listarAtivos()}.`,
+      404,
+    );
+  }
+
+  if (candidatos.length > 1) {
+    throw new AppError(
+      `O cliente tem mais de um agendamento ativo — peça pra ele especificar qual serviço. Agendamentos ativos: ${listarAtivos()}.`,
+      400,
+    );
+  }
+
+  return candidatos[0];
 }
 
 async function remarcarAgendamento(clienteId, argumentos) {
-  const atual = await buscarAgendamentoDoCliente(clienteId, argumentos.agendamento_id);
+  const atual = await resolverAgendamentoDoClientePorServico(clienteId, argumentos.nome_servico);
   const agendamento = await agendamentosService.atualizar(atual.id, {
     data_hora: new Date(argumentos.data_hora),
   });
-  return { id: agendamento.id, status: agendamento.status, data_hora: agendamento.data_hora };
+  return {
+    id: agendamento.id,
+    status: agendamento.status,
+    data_hora: agendamento.data_hora,
+    servico: atual.servicos?.nome ?? null,
+  };
 }
 
 async function cancelarAgendamento(clienteId, argumentos) {
-  const atual = await buscarAgendamentoDoCliente(clienteId, argumentos.agendamento_id);
+  const atual = await resolverAgendamentoDoClientePorServico(clienteId, argumentos.nome_servico);
   const agendamento = await agendamentosService.atualizar(atual.id, { status: "cancelado" });
-  return { id: agendamento.id, status: agendamento.status };
+  return {
+    id: agendamento.id,
+    status: agendamento.status,
+    data_hora: atual.data_hora,
+    servico: atual.servicos?.nome ?? null,
+  };
 }
 
 async function consultarMeusAgendamentos(clienteId) {
@@ -198,6 +451,10 @@ export async function executarFerramenta(clienteId, nome, argumentos) {
     if (erro instanceof AppError) {
       return { erro: erro.message };
     }
-    throw erro;
+    // IDs vindos do modelo não são confiáveis (ele pode "inventar" um id que não existe) —
+    // qualquer erro do serviço interno (ex: Prisma not-found) vira um resultado de ferramenta
+    // recuperável em vez de derrubar a conversa inteira. O erro original ainda vai pro log.
+    console.error(`Erro ao executar ferramenta "${nome}":`, erro);
+    return { erro: "Não foi possível concluir essa ação com os dados informados. Confira e tente novamente." };
   }
 }

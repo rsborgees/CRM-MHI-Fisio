@@ -125,15 +125,16 @@ model pagamentos {
 }
 
 model profissionais {
-  id            Int            @id @default(autoincrement())
-  nome          String         @db.VarChar(200)
-  especialidade String?        @db.VarChar(100)
-  telefone      String?        @db.VarChar(30)
-  email         String?        @db.VarChar(150)
-  observacoes   String?
-  ativo         Boolean?       @default(true)
-  agendamentos  agendamentos[]
-  avaliacoes    avaliacoes[]
+  id                Int            @id @default(autoincrement())
+  nome              String         @db.VarChar(200)
+  especialidade     String?        @db.VarChar(100)
+  telefone          String?        @db.VarChar(30)
+  email             String?        @db.VarChar(150)
+  observacoes       String?
+  ativo             Boolean?       @default(true)
+  agendamentos      agendamentos[]
+  avaliacoes        avaliacoes[]
+  servicosAtendidos servicos[]     @relation("ProfissionalServicos")
 }
 
 model usuarios {
@@ -146,12 +147,13 @@ model usuarios {
 }
 
 model servicos {
-  id              Int            @id @default(autoincrement())
-  nome            String         @db.VarChar(150)
-  descricao       String?
-  duracao_minutos Int?
-  preco           Decimal?       @db.Decimal(12, 2)
-  categoria       String?        @db.VarChar(100)
-  ativo           Boolean?       @default(true)
-  agendamentos    agendamentos[]
+  id                       Int             @id @default(autoincrement())
+  nome                     String          @db.VarChar(150)
+  descricao                String?
+  duracao_minutos          Int?
+  preco                    Decimal?        @db.Decimal(12, 2)
+  categoria                String?         @db.VarChar(100)
+  ativo                    Boolean?        @default(true)
+  agendamentos             agendamentos[]
+  profissionaisQueAtendem  profissionais[] @relation("ProfissionalServicos")
 }

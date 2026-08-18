@@ -1,6 +1,10 @@
 import { intervaloDoAgendamento, intervalosSeSobrepoem } from "./conflito.js";
 
 const DURACAO_PADRAO_MINUTOS = 60;
+// Grade fixa de horários candidatos — independente da duração do serviço, senão serviços
+// com duração que não divide 60 (ex: 45min) pulam horas cheias que estão livres (9h, 10h, 13h...)
+// porque o cursor avançaria de 45 em 45 minutos a partir da abertura.
+const INTERVALO_GRADE_MINUTOS = 15;
 
 export function gerarHorariosCandidatos({
   data,
@@ -31,7 +35,7 @@ export function gerarHorariosCandidatos({
       candidatos.push(new Date(cursor));
     }
 
-    cursor = new Date(cursor.getTime() + duracao * 60000);
+    cursor = new Date(cursor.getTime() + INTERVALO_GRADE_MINUTOS * 60000);
   }
 
   return candidatos;

@@ -11,7 +11,7 @@ jest.unstable_mockModule("./conversas.service.js", () => ({
   estaPausado: jest.fn().mockResolvedValue(false),
 }));
 
-jest.unstable_mockModule("./zapi.js", () => ({
+jest.unstable_mockModule("./evolutionApi.js", () => ({
   enviarMensagem: jest.fn().mockResolvedValue({}),
 }));
 
@@ -34,9 +34,17 @@ jest.unstable_mockModule("./llmClient.js", () => ({
 }));
 
 const llmClient = await import("./llmClient.js");
-const { enviarMensagem } = await import("./zapi.js");
+const { enviarMensagem } = await import("./evolutionApi.js");
 const { carregarHistorico, salvarHistorico, estaPausado } = await import("./conversas.service.js");
-const { processarMensagemRecebida } = await import("./webhook.controller.js");
+const { executarFerramenta } = await import("./tools.js");
+const { processarMensagemRecebida, handleWebhook } = await import("./webhook.controller.js");
+
+function criarRes() {
+  const res = {};
+  res.status = jest.fn().mockReturnValue(res);
+  res.json = jest.fn().mockReturnValue(res);
+  return res;
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -53,6 +61,35 @@ test("responde direto quando o modelo não pede nenhuma ferramenta", async () =>
 
   expect(resultado).toBe("Olá! Como posso ajudar?");
   expect(enviarMensagem).toHaveBeenCalledWith("5511999999999", "Olá! Como posso ajudar?");
+});
+
+test("converte negrito estilo Markdown (**texto**) pro formato do WhatsApp (*texto*)", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({
+    texto: "Temos **Depilação a Laser** por R$250.",
+    chamadasDeFerramenta: [],
+  });
+
+  await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quais servicos?" });
+
+  expect(enviarMensagem).toHaveBeenCalledWith("5511999999999", "Temos *Depilação a Laser* por R$250.");
+});
+
+test("manda cada parágrafo da resposta como uma mensagem separada no WhatsApp, em vez de uma só com quebras de linha", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({
+    texto: "Para depilação a laser, no dia amanhã, temos os horários 12h e 13h disponíveis.\n\nQuer agendar algum desses?",
+    chamadasDeFerramenta: [],
+  });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "tem horário amanhã?" });
+
+  expect(resultado).toContain("Quer agendar algum desses?");
+  expect(enviarMensagem).toHaveBeenCalledTimes(2);
+  expect(enviarMensagem).toHaveBeenNthCalledWith(
+    1,
+    "5511999999999",
+    "Para depilação a laser, no dia amanhã, temos os horários 12h e 13h disponíveis.",
+  );
+  expect(enviarMensagem).toHaveBeenNthCalledWith(2, "5511999999999", "Quer agendar algum desses?");
 });
 
 test("executa a ferramenta pedida e volta pro modelo antes de responder", async () => {
@@ -126,6 +163,273 @@ test("manda só as últimas 20 mensagens pro modelo, mas salva o histórico comp
 
   const historicoSalvo = salvarHistorico.mock.calls[0][2];
   expect(historicoSalvo).toHaveLength(27);
+});
+
+test("handleWebhook ignora eventos que não são messages.upsert", async () => {
+  const res = criarRes();
+
+  await handleWebhook({ body: { event: "connection.update", data: {} } }, res);
+
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ status: "ignorado" });
+  expect(llmClient.gerarResposta).not.toHaveBeenCalled();
+});
+
+test("handleWebhook ignora mensagem de grupo", async () => {
+  const res = criarRes();
+
+  await handleWebhook(
+    {
+      body: {
+        event: "messages.upsert",
+        data: {
+          key: { remoteJid: "120363000000000000@g.us", fromMe: false, id: "1" },
+          pushName: "Ana",
+          message: { conversation: "oi" },
+        },
+      },
+    },
+    res,
+  );
+
+  expect(res.json).toHaveBeenCalledWith({ status: "ignorado" });
+  expect(llmClient.gerarResposta).not.toHaveBeenCalled();
+});
+
+test("handleWebhook ignora eco de mensagem enviada pela própria clínica", async () => {
+  const res = criarRes();
+
+  await handleWebhook(
+    {
+      body: {
+        event: "messages.upsert",
+        data: {
+          key: { remoteJid: "5511999999999@s.whatsapp.net", fromMe: true, id: "1" },
+          pushName: "Ana",
+          message: { conversation: "oi" },
+        },
+      },
+    },
+    res,
+  );
+
+  expect(res.json).toHaveBeenCalledWith({ status: "ignorado" });
+  expect(llmClient.gerarResposta).not.toHaveBeenCalled();
+});
+
+test("handleWebhook extrai telefone e texto de uma mensagem simples e processa normalmente", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({ texto: "Olá!", chamadasDeFerramenta: [] });
+  const res = criarRes();
+
+  await handleWebhook(
+    {
+      body: {
+        event: "messages.upsert",
+        data: {
+          key: { remoteJid: "5511999999999@s.whatsapp.net", fromMe: false, id: "1" },
+          pushName: "Ana",
+          message: { conversation: "oi" },
+        },
+      },
+    },
+    res,
+  );
+
+  expect(enviarMensagem).toHaveBeenCalledWith("5511999999999", "Olá!");
+  expect(res.json).toHaveBeenCalledWith({ status: "ok" });
+});
+
+test("handleWebhook extrai texto de extendedTextMessage", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({ texto: "Olá!", chamadasDeFerramenta: [] });
+  const res = criarRes();
+
+  await handleWebhook(
+    {
+      body: {
+        event: "messages.upsert",
+        data: {
+          key: { remoteJid: "5511999999999@s.whatsapp.net", fromMe: false, id: "1" },
+          pushName: "Ana",
+          message: { extendedTextMessage: { text: "oi, tudo bem?" } },
+        },
+      },
+    },
+    res,
+  );
+
+  expect(enviarMensagem).toHaveBeenCalledWith("5511999999999", "Olá!");
+  expect(res.json).toHaveBeenCalledWith({ status: "ok" });
+});
+
+test("handleWebhook ignora mensagem sem texto (ex: áudio, imagem sem legenda)", async () => {
+  const res = criarRes();
+
+  await handleWebhook(
+    {
+      body: {
+        event: "messages.upsert",
+        data: {
+          key: { remoteJid: "5511999999999@s.whatsapp.net", fromMe: false, id: "1" },
+          pushName: "Ana",
+          message: { audioMessage: {} },
+        },
+      },
+    },
+    res,
+  );
+
+  expect(res.json).toHaveBeenCalledWith({ status: "ignorado" });
+  expect(llmClient.gerarResposta).not.toHaveBeenCalled();
+});
+
+test("quando o agendamento é criado com sucesso, a confirmação é montada pelo backend (não pela IA)", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({
+    texto: "não deveria ser usado",
+    chamadasDeFerramenta: [
+      {
+        id: "1",
+        nome: "criarAgendamento",
+        argumentos: { nome_servico: "Depilação a Laser", data_hora: "2026-08-18T10:00:00" },
+      },
+    ],
+  });
+  executarFerramenta.mockResolvedValueOnce({
+    id: 1,
+    status: "agendado",
+    data_hora: "2026-08-18T13:00:00.000Z",
+    servico: "Depilação a Laser",
+  });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).toContain("Depilação a Laser");
+  expect(resultado).not.toBe("não deveria ser usado");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(1);
+});
+
+test("pede correção quando a IA confirma um agendamento sem chamar a ferramenta, e usa a confirmação determinística da chamada real que vem depois", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({ texto: "Sua depilação a laser foi agendada com sucesso!", chamadasDeFerramenta: [] })
+    .mockResolvedValueOnce({
+      texto: "não deveria ser usado",
+      chamadasDeFerramenta: [
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Depilação a Laser", data_hora: "2026-08-18T10:00:00" } },
+      ],
+    });
+  executarFerramenta.mockResolvedValueOnce({
+    id: 1,
+    status: "agendado",
+    data_hora: "2026-08-18T13:00:00.000Z",
+    servico: "Depilação a Laser",
+  });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).toContain("Depilação a Laser");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
+});
+
+test("pede correção quando a IA diz que registrou o nome do cliente sem chamar atualizarNomeCliente", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({ texto: "Ok! Cliente registrado como Fernanda Costa Lima.", chamadasDeFerramenta: [] })
+    .mockResolvedValueOnce({
+      texto: "não deveria ser usado",
+      chamadasDeFerramenta: [{ id: "1", nome: "atualizarNomeCliente", argumentos: { nome: "Fernanda Costa Lima" } }],
+    })
+    .mockResolvedValueOnce({ texto: "Prontinho, nome salvo!", chamadasDeFerramenta: [] });
+  executarFerramenta.mockResolvedValueOnce({ id: 3, nome: "Fernanda Costa Lima" });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "Meu nome é Fernanda Costa Lima" });
+
+  expect(resultado).toBe("Prontinho, nome salvo!");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(3);
+});
+
+test("pede correção quando a IA diz 'realizado com sucesso' sem chamar a ferramenta (variação de palavra não coberta antes)", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({ texto: "Agendamento realizado com sucesso: Radiofrequência Facial às 16h.", chamadasDeFerramenta: [] })
+    .mockResolvedValueOnce({
+      texto: "não deveria ser usado",
+      chamadasDeFerramenta: [
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Radiofrequência Facial", data_hora: "2026-08-17T16:00:00" } },
+      ],
+    });
+  executarFerramenta.mockResolvedValueOnce({
+    id: 1,
+    status: "agendado",
+    data_hora: "2026-08-17T19:00:00.000Z",
+    servico: "Radiofrequência Facial",
+  });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).toContain("Radiofrequência Facial");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
+});
+
+test("pede correção quando a IA diz 'Fechado!' sem chamar a ferramenta (variação de palavra não coberta antes)", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({
+      texto: "Fechado! Seu horário ficou para amanhã, dia 19/08, às 9h, para Radiofrequência. 😊 Te esperamos aqui!",
+      chamadasDeFerramenta: [],
+    })
+    .mockResolvedValueOnce({
+      texto: "não deveria ser usado",
+      chamadasDeFerramenta: [
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Radiofrequência Facial", data_hora: "2026-08-19T09:00:00" } },
+      ],
+    });
+  executarFerramenta.mockResolvedValueOnce({
+    id: 1,
+    status: "agendado",
+    data_hora: "2026-08-19T12:00:00.000Z",
+    servico: "Radiofrequência Facial",
+  });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).toContain("Radiofrequência Facial");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
+});
+
+test("devolve mensagem segura (não a confirmação fabricada) quando a IA insiste em confirmar sem ferramenta mesmo após o aviso", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({ texto: "Sua depilação a laser foi agendada!", chamadasDeFerramenta: [] })
+    .mockResolvedValueOnce({ texto: "Confirmado, já está no sistema!", chamadasDeFerramenta: [] });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).not.toContain("Confirmado, já está no sistema!");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
+});
+
+test("pede correção quando a IA nega disponibilidade sem consultar horários, e aceita a resposta real que vem depois", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({ texto: "Infelizmente não há disponibilidade nesse horário.", chamadasDeFerramenta: [] })
+    .mockResolvedValueOnce({
+      texto: "",
+      chamadasDeFerramenta: [{ id: "1", nome: "consultarHorariosDisponiveis", argumentos: { data: "2026-08-17" } }],
+    })
+    .mockResolvedValueOnce({ texto: "Temos sim horário às 16h hoje!", chamadasDeFerramenta: [] });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "tem horário hoje?" });
+
+  expect(resultado).toBe("Temos sim horário às 16h hoje!");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(3);
+});
+
+test("não bloqueia quando a IA nega disponibilidade depois de realmente ter consultado horários", async () => {
+  llmClient.gerarResposta
+    .mockResolvedValueOnce({
+      texto: "",
+      chamadasDeFerramenta: [{ id: "1", nome: "consultarHorariosDisponiveis", argumentos: { data: "2026-08-17" } }],
+    })
+    .mockResolvedValueOnce({ texto: "Infelizmente não há disponibilidade hoje.", chamadasDeFerramenta: [] });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "tem horário hoje?" });
+
+  expect(resultado).toBe("Infelizmente não há disponibilidade hoje.");
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
 });
 
 test("não chama a IA nem responde quando a conversa está pausada, mas salva a mensagem", async () => {

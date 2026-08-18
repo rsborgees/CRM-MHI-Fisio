@@ -154,3 +154,23 @@
   border: 1px dashed var(--color-border);
   border-radius: 12px;
 }
+
+.profissional-servicos-field {
+  flex: 1 1 100%;
+}
+
+.profissional-servicos-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.profissional-servico-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: normal;
+  color: var(--color-foreground);
+}

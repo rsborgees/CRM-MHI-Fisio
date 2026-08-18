@@ -12,6 +12,12 @@ export async function api(caminho, opcoes = {}) {
     },
   })
 
+  if (resposta.status === 401) {
+    localStorage.removeItem('token')
+    window.location.href = '/login'
+    throw new Error('Sessão expirada')
+  }
+
   const dados = await resposta.json().catch(() => null)
 
   if (!resposta.ok) {

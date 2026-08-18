@@ -7,6 +7,7 @@ export const criarProfissionalSchema = z.object({
   email: z.string().email().optional(),
   observacoes: z.string().optional(),
   ativo: z.boolean().optional(),
+  servico_ids: z.array(z.number()).optional(),
 });
 
 export const atualizarProfissionalSchema = criarProfissionalSchema.partial();

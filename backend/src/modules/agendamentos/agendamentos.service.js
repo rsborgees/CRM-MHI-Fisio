@@ -3,7 +3,7 @@ import { AppError } from "../../utils/AppError.js";
 import { intervaloDoAgendamento, intervalosSeSobrepoem } from "./conflito.js";
 import { gerarHorariosCandidatos } from "./disponibilidade.js";
 
-export async function listar({ data, profissional_id, cliente_id, status } = {}) {
+export async function listar({ data, data_inicio, data_fim, profissional_id, cliente_id, status } = {}) {
   const where = {
     profissional_id: profissional_id ? Number(profissional_id) : undefined,
     cliente_id: cliente_id ? Number(cliente_id) : undefined,
@@ -14,6 +14,11 @@ export async function listar({ data, profissional_id, cliente_id, status } = {})
     const inicio = new Date(`${data}T00:00:00`);
     const fim = new Date(`${data}T23:59:59.999`);
     where.data_hora = { gte: inicio, lte: fim };
+  } else if (data_inicio && data_fim) {
+    where.data_hora = {
+      gte: new Date(`${data_inicio}T00:00:00`),
+      lte: new Date(`${data_fim}T23:59:59.999`),
+    };
   }
 
   return prisma.agendamentos.findMany({
@@ -31,13 +36,14 @@ export async function buscarPorId(id) {
 }
 
 async function verificarConflito({ profissional_id, data_hora, duracao_minutos, ignorarId }) {
-  if (!profissional_id) return;
-
   const intervaloNovo = intervaloDoAgendamento({ data_hora, duracao_minutos });
 
+  // Sem profissional definido, o agendamento ocupa o recurso compartilhado da clínica —
+  // precisa checar contra TODOS os agendamentos do horário, não só os do mesmo profissional,
+  // senão dois agendamentos "sem profissional" nunca conflitam entre si.
   const candidatos = await prisma.agendamentos.findMany({
     where: {
-      profissional_id,
+      profissional_id: profissional_id || undefined,
       status: { not: "cancelado" },
       id: ignorarId ? { not: ignorarId } : undefined,
     },
@@ -48,7 +54,10 @@ async function verificarConflito({ profissional_id, data_hora, duracao_minutos, 
   );
 
   if (conflito) {
-    throw new AppError("Este profissional já tem um agendamento nesse horário", 409);
+    throw new AppError(
+      profissional_id ? "Este profissional já tem um agendamento nesse horário" : "Já existe um agendamento nesse horário",
+      409,
+    );
   }
 }
 
@@ -91,16 +100,16 @@ export async function horariosDisponiveis({ servico_id, profissional_id, data })
     duracao_minutos = servico.duracao_minutos;
   }
 
-  let agendamentosExistentes = [];
-  if (profissional_id) {
-    agendamentosExistentes = await prisma.agendamentos.findMany({
-      where: {
-        profissional_id: Number(profissional_id),
-        status: { not: "cancelado" },
-        data_hora: { gte: new Date(`${data}T00:00:00`), lte: new Date(`${data}T23:59:59`) },
-      },
-    });
-  }
+  // Mesma lógica de verificarConflito: sem profissional definido, precisa olhar TODOS os
+  // agendamentos do dia (não só os de um profissional específico) pra não sugerir um horário
+  // que já está ocupado por outro agendamento sem profissional.
+  const agendamentosExistentes = await prisma.agendamentos.findMany({
+    where: {
+      profissional_id: profissional_id ? Number(profissional_id) : undefined,
+      status: { not: "cancelado" },
+      data_hora: { gte: new Date(`${data}T00:00:00`), lte: new Date(`${data}T23:59:59`) },
+    },
+  });
 
   const candidatos = gerarHorariosCandidatos({
     data,
