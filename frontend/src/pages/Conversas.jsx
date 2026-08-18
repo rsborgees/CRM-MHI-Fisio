@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../api'
 import '../styles/paginaLista.css'
 import '../styles/chat.css'
 import './Conversas.css'
+
+const INTERVALO_ATUALIZACAO_CONTATOS_MS = 5000
+const INTERVALO_ATUALIZACAO_MENSAGENS_MS = 3000
 
 function formatarHora(data) {
   return new Date(data).toLocaleString('pt-BR', {
@@ -20,6 +23,9 @@ function Conversas() {
   const [mensagens, setMensagens] = useState([])
   const [pausado, setPausado] = useState(false)
   const [carregandoMensagens, setCarregandoMensagens] = useState(false)
+  const [novaMensagem, setNovaMensagem] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const fimDasMensagensRef = useRef(null)
 
   async function carregarContatos() {
     const dados = await api('/conversas-whatsapp')
@@ -27,17 +33,60 @@ function Conversas() {
     setCarregandoContatos(false)
   }
 
+  // Busca o conteúdo mais recente da conversa sem mexer no estado de "carregando" — usado tanto
+  // ao trocar de contato (com loading) quanto no polling automático (sem loading, silencioso).
+  async function atualizarMensagens(clienteId) {
+    const dados = await api(`/conversas-whatsapp/${clienteId}`)
+    setMensagens(dados.mensagens)
+    setPausado(dados.pausado)
+  }
+
   useEffect(() => {
     carregarContatos()
   }, [])
 
+  // Deixa a lista de conversas (e a pré-visualização da última mensagem) sempre atualizada
+  // sem precisar dar F5 — verifica de novo a cada alguns segundos.
+  useEffect(() => {
+    const intervalo = setInterval(carregarContatos, INTERVALO_ATUALIZACAO_CONTATOS_MS)
+    return () => clearInterval(intervalo)
+  }, [])
+
+  // Mesma ideia pro chat aberto: se chegar mensagem nova do cliente (ou de outro atendente)
+  // enquanto a conversa está aberta, aparece sozinha.
+  const clienteSelecionadoId = contatoSelecionado?.cliente_id
+  useEffect(() => {
+    if (!clienteSelecionadoId) return
+    const intervalo = setInterval(() => atualizarMensagens(clienteSelecionadoId), INTERVALO_ATUALIZACAO_MENSAGENS_MS)
+    return () => clearInterval(intervalo)
+  }, [clienteSelecionadoId])
+
+  useEffect(() => {
+    fimDasMensagensRef.current?.scrollIntoView({ block: 'end' })
+  }, [mensagens])
+
   async function selecionarContato(contato) {
     setContatoSelecionado(contato)
     setCarregandoMensagens(true)
-    const dados = await api(`/conversas-whatsapp/${contato.cliente_id}`)
+    await atualizarMensagens(contato.cliente_id)
+    setCarregandoMensagens(false)
+  }
+
+  async function handleEnviarMensagem(e) {
+    e.preventDefault()
+    const texto = novaMensagem.trim()
+    if (!texto || enviando) return
+
+    setEnviando(true)
+    const dados = await api(`/conversas-whatsapp/${contatoSelecionado.cliente_id}/mensagens`, {
+      method: 'POST',
+      body: JSON.stringify({ texto }),
+    })
     setMensagens(dados.mensagens)
     setPausado(dados.pausado)
-    setCarregandoMensagens(false)
+    setNovaMensagem('')
+    setEnviando(false)
+    carregarContatos()
   }
 
   async function handleAlternarPausa() {
@@ -113,8 +162,23 @@ function Conversas() {
                     {mensagem.conteudo}
                   </div>
                 ))}
+                <div ref={fimDasMensagensRef} />
               </div>
             )}
+
+            <form className="conversas-chat-composer" onSubmit={handleEnviarMensagem}>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Digite uma mensagem para enviar pelo WhatsApp..."
+                value={novaMensagem}
+                onChange={(e) => setNovaMensagem(e.target.value)}
+                disabled={enviando}
+              />
+              <button type="submit" className="btn-primary" disabled={enviando || !novaMensagem.trim()}>
+                Enviar
+              </button>
+            </form>
           </>
         )}
       </section>

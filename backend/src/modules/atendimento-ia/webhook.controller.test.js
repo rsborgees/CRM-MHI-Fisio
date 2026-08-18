@@ -1,5 +1,9 @@
 import { jest } from "@jest/globals";
 
+// Delay zero pro debounce de "mensagens picotadas" — nos testes não tem por que esperar de
+// verdade; o mecanismo de cancelar/reagendar timer funciona igual não importa a duração.
+process.env.DEBOUNCE_MENSAGENS_MS = "0";
+
 jest.unstable_mockModule("../clientes/clientes.service.js", () => ({
   buscarPorTelefone: jest.fn().mockResolvedValue({ id: 3, nome: "Ana" }),
   criar: jest.fn(),
@@ -158,7 +162,7 @@ test("manda só as últimas 20 mensagens pro modelo, mas salva o histórico comp
     papel: indice % 2 === 0 ? "usuario" : "assistente",
     conteudo: `mensagem antiga ${indice}`,
   }));
-  carregarHistorico.mockResolvedValueOnce(historicoAntigo);
+  carregarHistorico.mockResolvedValue(historicoAntigo);
   llmClient.gerarResposta.mockResolvedValueOnce({ texto: "resposta nova", chamadasDeFerramenta: [] });
 
   await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "mensagem nova" });
@@ -168,7 +172,7 @@ test("manda só as últimas 20 mensagens pro modelo, mas salva o histórico comp
   expect(chamada.mensagens.at(-1)).toEqual({ papel: "usuario", conteudo: "mensagem nova" });
   expect(chamada.mensagens[0]).toEqual({ papel: "usuario", conteudo: "mensagem antiga 6" });
 
-  const historicoSalvo = salvarHistorico.mock.calls[0][2];
+  const historicoSalvo = salvarHistorico.mock.calls.at(-1)[2];
   expect(historicoSalvo).toHaveLength(27);
 });
 
@@ -548,6 +552,37 @@ test("não bloqueia quando a IA nega disponibilidade depois de realmente ter con
 
   expect(resultado).toBe("Infelizmente não há disponibilidade hoje.");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
+});
+
+test("junta mensagens picotadas (mandadas em sequência) numa única resposta, em vez de responder a cada pedaço", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({
+    texto: "Oi! Radiofrequência facial pra amanhã de manhã, já vejo os horários pra você.",
+    chamadasDeFerramenta: [],
+  });
+
+  // as três chegam "picotadas" (uma logo depois da outra, antes de qualquer resposta) — só a
+  // ÚLTIMA chamada deve de fato disparar a IA, com o histórico das três já salvo.
+  const p1 = processarMensagemRecebida({ telefone: "5511999999999", mensagem: "oi" });
+  const p2 = processarMensagemRecebida({ telefone: "5511999999999", mensagem: "queria fazer radiofrequência facial" });
+  const p3 = processarMensagemRecebida({ telefone: "5511999999999", mensagem: "pra amanhã de manhã" });
+
+  const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+  // as três chamadas resolvem pra mesma resposta final (a que realmente foi enviada ao cliente).
+  expect(r1).toBe(r2);
+  expect(r2).toBe(r3);
+  expect(llmClient.gerarResposta).toHaveBeenCalledTimes(1);
+  expect(enviarMensagem).toHaveBeenCalledTimes(1);
+
+  const mensagensEnviadasAoModelo = llmClient.gerarResposta.mock.calls[0][0].mensagens;
+  expect(mensagensEnviadasAoModelo).toEqual([
+    { papel: "usuario", conteudo: "oi" },
+    { papel: "usuario", conteudo: "queria fazer radiofrequência facial" },
+    { papel: "usuario", conteudo: "pra amanhã de manhã" },
+  ]);
+
+  const historicoSalvoFinal = salvarHistorico.mock.calls.at(-1)[2];
+  expect(historicoSalvoFinal).toHaveLength(4);
 });
 
 test("não chama a IA nem responde quando a conversa está pausada, mas salva a mensagem", async () => {

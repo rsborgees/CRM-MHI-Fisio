@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { getUsuarioAtual } from '../api'
 import {
   IconDashboard,
   IconAgenda,
@@ -8,11 +9,13 @@ import {
   IconProfissionais,
   IconServicos,
   IconConfiguracoes,
+  IconPerfil,
+  IconUsuarios,
   IconSair,
 } from './icons'
 import './Sidebar.css'
 
-const links = [
+const LINKS_BASE = [
   { to: '/dashboard', label: 'Dashboard', Icon: IconDashboard },
   { to: '/agenda', label: 'Agenda', Icon: IconAgenda },
   { to: '/clientes', label: 'Clientes', Icon: IconClientes },
@@ -20,11 +23,18 @@ const links = [
   { to: '/financeiro', label: 'Financeiro', Icon: IconFinanceiro },
   { to: '/profissionais', label: 'Profissionais', Icon: IconProfissionais },
   { to: '/servicos', label: 'Serviços', Icon: IconServicos },
-  { to: '/configuracoes', label: 'Configurações', Icon: IconConfiguracoes },
 ]
+
+// Configurações do agente de IA é área técnica — some da barra pra quem é só "usuário".
+const LINK_CONFIGURACOES = { to: '/configuracoes', label: 'Configurações', Icon: IconConfiguracoes }
 
 function Sidebar() {
   const navigate = useNavigate()
+  const usuario = getUsuarioAtual()
+  const papel = usuario?.papel
+
+  const links =
+    papel === 'administrador' || papel === 'desenvolvedor' ? [...LINKS_BASE, LINK_CONFIGURACOES] : LINKS_BASE
 
   function handleLogout() {
     localStorage.removeItem('token')
@@ -50,6 +60,26 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {papel === 'administrador' && (
+        <NavLink
+          to="/usuarios"
+          aria-label="Usuários"
+          className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}
+        >
+          <IconUsuarios />
+          <span className="sidebar-tooltip">Usuários</span>
+        </NavLink>
+      )}
+
+      <NavLink
+        to="/perfil"
+        aria-label="Meu perfil"
+        className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}
+      >
+        <IconPerfil />
+        <span className="sidebar-tooltip">Meu perfil</span>
+      </NavLink>
 
       <button
         type="button"

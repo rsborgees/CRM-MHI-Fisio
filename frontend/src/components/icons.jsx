@@ -89,6 +89,17 @@ export function IconConversas() {
   )
 }
 
+export function IconUsuarios() {
+  return (
+    <svg {...props}>
+      <rect x="4" y="3" width="16" height="18" rx="2.5" />
+      <circle cx="12" cy="9.5" r="2.6" />
+      <path d="M8 16c.6-2 2-3 4-3s3.4 1 4 3" />
+      <path d="M8 3.5v-1M16 3.5v-1" />
+    </svg>
+  )
+}
+
 export function IconEditar() {
   return (
     <svg {...props} width="16" height="16">
@@ -114,6 +125,16 @@ export function IconConfiguracoes() {
     <svg {...props}>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.65 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.65a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.65a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.35 9c.13.42.5 1.04 1.56 1.04H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z" />
+    </svg>
+  )
+}
+
+export function IconPerfil() {
+  return (
+    <svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="10" r="3.2" />
+      <path d="M6.3 18.5c.8-2.6 2.9-4 5.7-4s4.9 1.4 5.7 4" />
     </svg>
   )
 }

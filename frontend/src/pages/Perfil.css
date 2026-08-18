@@ -1,0 +1,14 @@
+.perfil-secao-titulo {
+  font-size: 16px;
+  margin: 0 0 16px;
+}
+
+.perfil-mensagem {
+  font-size: 14px;
+  color: var(--color-gold-hover);
+}
+
+.perfil-erro {
+  font-size: 14px;
+  color: var(--color-destructive);
+}

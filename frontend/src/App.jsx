@@ -10,7 +10,10 @@ import Profissionais from './pages/Profissionais'
 import Servicos from './pages/Servicos'
 import Pacotes from './pages/Pacotes'
 import Configuracoes from './pages/Configuracoes'
+import Perfil from './pages/Perfil'
+import Usuarios from './pages/Usuarios'
 import AreaProtegida from './components/AreaProtegida'
+import RequirePapel from './components/RequirePapel'
 
 function App() {
   return (
@@ -28,7 +31,23 @@ function App() {
           <Route path="/profissionais" element={<Profissionais />} />
           <Route path="/servicos" element={<Servicos />} />
           <Route path="/pacotes" element={<Pacotes />} />
-          <Route path="/configuracoes" element={<Configuracoes />} />
+          <Route
+            path="/configuracoes"
+            element={
+              <RequirePapel papeis={['administrador', 'desenvolvedor']}>
+                <Configuracoes />
+              </RequirePapel>
+            }
+          />
+          <Route path="/perfil" element={<Perfil />} />
+          <Route
+            path="/usuarios"
+            element={
+              <RequirePapel papeis={['administrador']}>
+                <Usuarios />
+              </RequirePapel>
+            }
+          />
         </Route>
 
         <Route path="/" element={<Navigate to="/dashboard" />} />

@@ -15,8 +15,10 @@ import agendamentosRoutes from "./modules/agendamentos/agendamentos.routes.js";
 import pagamentosRoutes from "./modules/pagamentos/pagamentos.routes.js";
 import historicoRoutes from "./modules/historico/historico.routes.js";
 import avaliacoesRoutes from "./modules/avaliacoes/avaliacoes.routes.js";
+import usuariosRoutes from "./modules/usuarios/usuarios.routes.js";
 
 import { requireAuth } from "./middlewares/auth.middleware.js";
+import { requireRole } from "./middlewares/requireRole.js";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 
 export const app = express();
@@ -30,7 +32,8 @@ app.use("/auth", authRoutes);
 app.use("/webhook/whatsapp", webhookWhatsappRoutes);
 
 app.use("/conversas-whatsapp", requireAuth, conversasWhatsappRoutes);
-app.use("/configuracao-agente", requireAuth, configuracaoAgenteRoutes);
+// Configurações do agente de IA é área técnica — usuário comum não mexe nisso.
+app.use("/configuracao-agente", requireAuth, requireRole("administrador", "desenvolvedor"), configuracaoAgenteRoutes);
 app.use("/dashboard", requireAuth, dashboardRoutes);
 app.use("/clientes", requireAuth, clientesRoutes);
 app.use("/profissionais", requireAuth, profissionaisRoutes);
@@ -40,6 +43,8 @@ app.use("/agendamentos", requireAuth, agendamentosRoutes);
 app.use("/pagamentos", requireAuth, pagamentosRoutes);
 app.use("/historico", requireAuth, historicoRoutes);
 app.use("/avaliacoes", requireAuth, avaliacoesRoutes);
+// Gerenciar contas de outras pessoas (papel, senha, exclusão) é exclusivo de administrador.
+app.use("/usuarios", requireAuth, requireRole("administrador"), usuariosRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

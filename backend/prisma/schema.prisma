@@ -64,6 +64,9 @@ model clientes {
   origem             String?              @db.VarChar(100)
   status             String?              @default("ativo") @db.VarChar(20)
   observacoes        String?
+  // true só quando o próprio cliente confirmou o nome numa conversa (via atualizarNomeCliente) —
+  // o nome pode vir preenchido com o pushName do WhatsApp sem nunca ter sido confirmado por ele.
+  nome_confirmado    Boolean              @default(false)
   agendamentos       agendamentos[]
   avaliacoes         avaliacoes[]
   conversas_whatsapp conversas_whatsapp[]
@@ -142,6 +145,9 @@ model usuarios {
   nome       String   @db.VarChar(200)
   email      String   @unique @db.VarChar(150)
   senha_hash String   @db.VarChar(255)
+  // "administrador" | "desenvolvedor" | "usuario" — controla o que a pessoa pode acessar
+  // (ver middlewares/requireRole.js). Default "usuario" é o menos privilegiado.
+  papel      String   @default("usuario") @db.VarChar(20)
   ativo      Boolean  @default(true)
   created_at DateTime @default(now()) @db.Timestamp(6)
 }

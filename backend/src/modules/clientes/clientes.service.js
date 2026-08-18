@@ -23,8 +23,22 @@ export async function atualizar(id, dados) {
   return prisma.clientes.update({ where: { id }, data: dados });
 }
 
+// Excluir um cliente sem isso falhava (violação de chave estrangeira) sempre que ele já tinha
+// pagamento, agendamento, avaliação, conversa de WhatsApp ou histórico vinculado — o que é o
+// caso normal de qualquer cliente com algum uso real. Por isso a exclusão precisa arrastar
+// junto todos os dados dependentes, numa transação (tudo ou nada).
 export async function remover(id) {
-  await prisma.clientes.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    const agendamentos = await tx.agendamentos.findMany({ where: { cliente_id: id }, select: { id: true } });
+    const agendamentoIds = agendamentos.map((agendamento) => agendamento.id);
+
+    await tx.pagamentos.deleteMany({ where: { OR: [{ cliente_id: id }, { agendamento_id: { in: agendamentoIds } }] } });
+    await tx.avaliacoes.deleteMany({ where: { OR: [{ cliente_id: id }, { agendamento_id: { in: agendamentoIds } }] } });
+    await tx.historico_clientes.deleteMany({ where: { cliente_id: id } });
+    await tx.conversas_whatsapp.deleteMany({ where: { cliente_id: id } });
+    await tx.agendamentos.deleteMany({ where: { cliente_id: id } });
+    await tx.clientes.delete({ where: { id } });
+  });
 }
 
 export async function buscarPorTelefone(telefone) {

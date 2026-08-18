@@ -88,7 +88,8 @@ export const DEFINICOES_FERRAMENTAS = [
       "Lista horários disponíveis, opcionalmente filtrando por data, serviço e profissional. Devolve só alguns " +
       "horários de exemplo (não a lista completa) e o total de horários livres naquele dia. Os horários já vêm " +
       "no horário local da clínica, prontos para copiar direto no data_hora de criarAgendamento — não precisa " +
-      "converter fuso horário.",
+      "converter fuso horário. O resultado inclui 'dia_semana' (ex: 'quarta-feira') — sempre use esse valor pra " +
+      "falar o dia da semana com o cliente, nunca calcule você mesma, é fácil errar a conta.",
     parametros: {
       type: "object",
       properties: {
@@ -304,6 +305,9 @@ async function consultarHorariosDisponiveis(clienteId, argumentos) {
 
   const resultado = {
     data,
+    // Calculado aqui, não pela IA — um modelo pequeno erra conta de "que dia da semana cai
+    // essa data" com facilidade (ex: já disse "segunda-feira" pra uma data que era quarta).
+    dia_semana: DIAS_DA_SEMANA[new Date(`${data}T00:00:00`).getDay()],
     horarios: escolherHorariosSugeridos(horarios).map(paraDataHoraLocalISO),
     total_disponivel: horarios.length,
   };
@@ -328,11 +332,12 @@ async function criarAgendamento(clienteId, argumentos) {
     throw new AppError("É necessário informar o nome do serviço para criar o agendamento.", 400);
   }
 
-  // Cliente novo pelo WhatsApp entra com um nome provisório (ex: "Cliente WhatsApp 5511...")
-  // até informar o nome de verdade — não deixa agendar sem isso, mesmo que a IA "esqueça" de
-  // perguntar antes.
+  // O nome só reflete o pushName do WhatsApp (ou o placeholder "Cliente WhatsApp ...") até o
+  // cliente confirmar de verdade numa conversa — não dá pra agendar sem isso, mesmo que a IA
+  // "esqueça" de perguntar antes. pushName pode ser um apelido, nome só de primeiro nome, ou
+  // até de outra pessoa (o dono do número), então nunca é aceito como nome completo sem confirmar.
   const cliente = await clientesService.buscarPorId(clienteId);
-  if (cliente.nome.startsWith("Cliente WhatsApp")) {
+  if (!cliente.nome_confirmado) {
     throw new AppError(
       "Antes de criar o agendamento, pergunte o nome completo do cliente e chame atualizarNomeCliente para salvar.",
       400,
@@ -451,7 +456,7 @@ async function consultarMeusAgendamentos(clienteId) {
 }
 
 async function atualizarNomeCliente(clienteId, argumentos) {
-  const cliente = await clientesService.atualizar(clienteId, { nome: argumentos.nome });
+  const cliente = await clientesService.atualizar(clienteId, { nome: argumentos.nome, nome_confirmado: true });
   return { id: cliente.id, nome: cliente.nome };
 }
 

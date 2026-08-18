@@ -12,6 +12,10 @@ export async function carregarHistorico(clienteId) {
   return conversa?.mensagens ?? [];
 }
 
+export async function buscarConversa(clienteId) {
+  return prisma.conversas_whatsapp.findFirst({ where: { cliente_id: clienteId } });
+}
+
 export async function estaPausado(clienteId) {
   const conversa = await prisma.conversas_whatsapp.findFirst({ where: { cliente_id: clienteId } });
   return conversa?.pausado ?? false;

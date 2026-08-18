@@ -8,6 +8,10 @@ import { enviarMensagem } from "./evolutionApi.js";
 
 const MAX_ITERACOES_FERRAMENTA = 5;
 const MAX_MENSAGENS_CONTEXTO = 20;
+// Quanto tempo esperar depois de UMA mensagem antes de chamar a IA — se o cliente mandar mais
+// mensagens "picotadas" (várias seguidas em vez de uma só) dentro dessa janela, a espera reinicia
+// e todas entram numa resposta só, em vez de a IA responder (ou se confundir) a cada pedaço.
+const TEMPO_ESPERA_MENSAGENS_PICOTADAS_MS = Number(process.env.DEBOUNCE_MENSAGENS_MS ?? 8000);
 const MENSAGEM_FALLBACK_ERRO =
   "Estou com dificuldade técnica agora, por favor tente novamente em alguns minutos ou fale com a recepção.";
 const MENSAGEM_FALLBACK_LIMITE =
@@ -218,21 +222,9 @@ async function obterRespostaDoAgente(clienteId, historico, instrucaoSistema) {
   return MENSAGEM_FALLBACK_LIMITE;
 }
 
-export async function processarMensagemRecebida({ telefone, mensagem, pushName }) {
-  const cliente = await resolverCliente(telefone, pushName);
-
-  const historico = await conversasService.carregarHistorico(cliente.id);
-  const primeiraMensagem = historico.length === 0;
-  historico.push({ papel: "usuario", conteudo: mensagem });
-
-  // Enquanto a IA estiver pausada pra esse cliente, só guardamos a mensagem no
-  // histórico (pra aparecer no painel) e não respondemos automaticamente.
-  const pausado = await conversasService.estaPausado(cliente.id);
-  if (pausado) {
-    await conversasService.salvarHistorico(cliente.id, telefone, historico, pushName);
-    return null;
-  }
-
+// Gera e manda a resposta pra UM cliente, considerando o histórico já acumulado até agora
+// (incluindo eventuais mensagens picotadas que chegaram durante a espera do debounce).
+async function gerarRespostaEEnviar(cliente, telefone, pushName, primeiraMensagem) {
   const instrucaoBase = await configuracaoService.obterInstrucaoSistema();
   const resumoCliente = await gerarResumoCliente(cliente);
   const instrucaoSistema = gerarInstrucaoSistema({
@@ -242,9 +234,10 @@ export async function processarMensagemRecebida({ telefone, mensagem, pushName }
     primeiraMensagem,
   });
 
+  const historicoAtual = await conversasService.carregarHistorico(cliente.id);
   // Manda só as últimas N mensagens pro modelo (memória de curto prazo) — o histórico
   // completo continua salvo no banco e visível no painel de Conversas independentemente disso.
-  const contexto = historico.slice(-MAX_MENSAGENS_CONTEXTO);
+  const contexto = historicoAtual.slice(-MAX_MENSAGENS_CONTEXTO);
 
   let textoFinal;
   try {
@@ -258,10 +251,11 @@ export async function processarMensagemRecebida({ telefone, mensagem, pushName }
   // (um asterisco só) — sem isso, o cliente veria os asteriscos duplos literalmente.
   textoFinal = textoFinal.replace(/\*\*(.+?)\*\*/g, "*$1*");
 
-  // Salva o histórico e responde mesmo quando a IA falhou — o cliente escreveu de
-  // verdade e isso precisa aparecer no painel de conversas independentemente do resultado.
-  historico.push({ papel: "assistente", conteudo: textoFinal });
-  await conversasService.salvarHistorico(cliente.id, telefone, historico, pushName);
+  // Recarrega de novo antes de salvar — se outra mensagem picotada entrou bem no meio da
+  // geração da resposta, isso evita sobrescrever ela.
+  const historicoParaSalvar = await conversasService.carregarHistorico(cliente.id);
+  historicoParaSalvar.push({ papel: "assistente", conteudo: textoFinal });
+  await conversasService.salvarHistorico(cliente.id, telefone, historicoParaSalvar, pushName);
 
   // O painel guarda a resposta inteira como uma mensagem só (mais fácil de ler), mas no
   // WhatsApp mandamos cada parágrafo como uma mensagem separada — fica mais natural do que
@@ -273,7 +267,72 @@ export async function processarMensagemRecebida({ telefone, mensagem, pushName }
   return textoFinal;
 }
 
-function dividirEmMensagens(texto) {
+// Estado de debounce por cliente: fila de salvamento (serializa leitura+escrita do histórico,
+// pra duas mensagens quase simultâneas não sobrescreverem uma a outra) + o timer que dispara a
+// resposta da IA + quem está esperando essa resposta (pode ser mais de um envio picotado).
+const estadoPorCliente = new Map();
+
+function obterEstadoDoCliente(clienteId) {
+  let estado = estadoPorCliente.get(clienteId);
+  if (!estado) {
+    estado = { filaSalvar: Promise.resolve(), timer: null, primeiraMensagem: false, resolvers: [] };
+    estadoPorCliente.set(clienteId, estado);
+  }
+  return estado;
+}
+
+export async function processarMensagemRecebida({ telefone, mensagem, pushName }) {
+  const cliente = await resolverCliente(telefone, pushName);
+  const estado = obterEstadoDoCliente(cliente.id);
+
+  // Serializa leitura+escrita do histórico por cliente — sem isso, duas mensagens picotadas
+  // chegando quase juntas poderiam ler o histórico antes uma da outra salvar, e uma sobrescreveria
+  // a outra (não tem trava de banco num "lê tudo, adiciona, salva tudo").
+  const chamadaDeSalvar = estado.filaSalvar.then(async () => {
+    const historico = await conversasService.carregarHistorico(cliente.id);
+    const primeiraMensagemDesteEnvio = historico.length === 0;
+    historico.push({ papel: "usuario", conteudo: mensagem });
+    await conversasService.salvarHistorico(cliente.id, telefone, historico, pushName);
+    return primeiraMensagemDesteEnvio;
+  });
+  // A fila em si nunca fica "travada" rejeitada — quem chamou ainda vê o erro de verdade abaixo.
+  estado.filaSalvar = chamadaDeSalvar.catch(() => {});
+  const primeiraMensagemDesteEnvio = await chamadaDeSalvar;
+
+  // Enquanto a IA estiver pausada pra esse cliente, só guardamos a mensagem no
+  // histórico (pra aparecer no painel) e não respondemos automaticamente.
+  const pausado = await conversasService.estaPausado(cliente.id);
+  if (pausado) {
+    return null;
+  }
+
+  // Só a PRIMEIRA mensagem de um lote picotado decide se é "primeira mensagem da conversa" —
+  // as próximas mensagens do mesmo lote só reiniciam a espera, sem mexer nessa flag.
+  if (!estado.timer) {
+    estado.primeiraMensagem = primeiraMensagemDesteEnvio;
+  } else {
+    clearTimeout(estado.timer);
+  }
+
+  return new Promise((resolve) => {
+    estado.resolvers.push(resolve);
+
+    estado.timer = setTimeout(async () => {
+      estadoPorCliente.delete(cliente.id);
+      let textoFinal;
+      try {
+        textoFinal = await gerarRespostaEEnviar(cliente, telefone, pushName, estado.primeiraMensagem);
+      } catch (erro) {
+        console.error("Erro ao processar mensagem do WhatsApp:", erro);
+        textoFinal = MENSAGEM_FALLBACK_ERRO;
+        await enviarMensagem(telefone, MENSAGEM_FALLBACK_ERRO).catch(() => {});
+      }
+      estado.resolvers.forEach((resolver) => resolver(textoFinal));
+    }, TEMPO_ESPERA_MENSAGENS_PICOTADAS_MS);
+  });
+}
+
+export function dividirEmMensagens(texto) {
   return texto
     .split(/\n\s*\n/)
     .map((parte) => parte.trim())
@@ -306,12 +365,18 @@ export async function handleWebhook(req, res) {
     return res.status(200).json({ status: "ignorado" });
   }
 
-  try {
-    await processarMensagemRecebida({ telefone, mensagem, pushName: senderName });
-  } catch (erro) {
-    console.error("Erro ao processar mensagem do WhatsApp:", erro);
-    await enviarMensagem(telefone, MENSAGEM_FALLBACK_ERRO).catch(() => {});
-  }
+  // Não espera o processamento completo (que inclui a espera do debounce de mensagens picotadas
+  // e o tempo da IA) pra responder o webhook — a Evolution API só precisa de uma confirmação
+  // rápida de recebimento, não do resultado da conversa. O `return` da promise abaixo não atrasa
+  // essa resposta (já foi enviada); só existe pra quem quiser aguardar a conclusão (ex: testes).
+  const promessaProcessamento = processarMensagemRecebida({ telefone, mensagem, pushName: senderName }).catch(
+    async (erro) => {
+      console.error("Erro ao processar mensagem do WhatsApp:", erro);
+      await enviarMensagem(telefone, MENSAGEM_FALLBACK_ERRO).catch(() => {});
+    },
+  );
 
   res.status(200).json({ status: "ok" });
+
+  return promessaProcessamento;
 }

@@ -1,8 +1,8 @@
 import { jest } from "@jest/globals";
 
 jest.unstable_mockModule("../clientes/clientes.service.js", () => ({
-  atualizar: jest.fn().mockResolvedValue({ id: 2, nome: "Maria Silva" }),
-  buscarPorId: jest.fn().mockResolvedValue({ id: 2, nome: "Maria Silva" }),
+  atualizar: jest.fn().mockResolvedValue({ id: 2, nome: "Maria Silva", nome_confirmado: true }),
+  buscarPorId: jest.fn().mockResolvedValue({ id: 2, nome: "Maria Silva", nome_confirmado: true }),
 }));
 
 jest.unstable_mockModule("../agendamentos/agendamentos.service.js", () => ({
@@ -108,6 +108,15 @@ test("consultarHorariosDisponiveis converte os horários (UTC) pro fuso de São 
   const resultado = await executarFerramenta(2, "consultarHorariosDisponiveis", { data: "2026-01-10" });
 
   expect(resultado.horarios).toEqual(["2026-01-10T09:00:00", "2026-01-10T10:00:00"]);
+});
+
+test("consultarHorariosDisponiveis informa o dia da semana calculado pelo código, não deixa a IA calcular (reproduz caso real: modelo disse 'segunda' quando era quarta)", async () => {
+  agendamentosService.horariosDisponiveis.mockResolvedValueOnce([]);
+
+  const resultado = await executarFerramenta(2, "consultarHorariosDisponiveis", { data: "2026-08-19" });
+
+  // 2026-08-19 é uma quarta-feira de verdade.
+  expect(resultado.dia_semana).toBe("quarta-feira");
 });
 
 test("consultarHorariosDisponiveis confirma quando o horário específico pedido pelo cliente está disponível", async () => {
@@ -249,7 +258,20 @@ test("cancelarAgendamento pede pra especificar o serviço quando há mais de um 
 });
 
 test("criarAgendamento recusa quando o cliente ainda não tem nome cadastrado (só o placeholder do WhatsApp)", async () => {
-  clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Cliente WhatsApp 5511999999999" });
+  clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Cliente WhatsApp 5511999999999", nome_confirmado: false });
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+
+  const resultado = await executarFerramenta(2, "criarAgendamento", {
+    nome_servico: "Depilação a Laser",
+    data_hora: "2026-01-10T10:00:00",
+  });
+
+  expect(resultado.erro).toContain("nome completo");
+  expect(agendamentosService.criar).not.toHaveBeenCalled();
+});
+
+test("criarAgendamento recusa quando o nome veio só do pushName do WhatsApp e o cliente nunca confirmou (reproduz caso real)", async () => {
+  clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Rafaella", nome_confirmado: false });
   servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
@@ -374,10 +396,10 @@ test("remarcarAgendamento recusa quando não encontra agendamento ativo pro serv
   expect(agendamentosService.atualizar).not.toHaveBeenCalled();
 });
 
-test("atualizarNomeCliente salva o nome informado pelo cliente da conversa", async () => {
+test("atualizarNomeCliente salva o nome informado pelo cliente da conversa e marca como confirmado", async () => {
   const resultado = await executarFerramenta(2, "atualizarNomeCliente", { nome: "Maria Silva" });
 
-  expect(clientesService.atualizar).toHaveBeenCalledWith(2, { nome: "Maria Silva" });
+  expect(clientesService.atualizar).toHaveBeenCalledWith(2, { nome: "Maria Silva", nome_confirmado: true });
   expect(resultado).toEqual({ id: 2, nome: "Maria Silva" });
 });
 
