@@ -48,6 +48,24 @@ test("criar funciona normalmente quando não há conflito de horário", async ()
   expect(mockCreate).toHaveBeenCalled();
 });
 
+test("criar recusa agendamento no horário de almoço (12h às 13h), mesmo sem nenhum outro agendamento conflitante", async () => {
+  // não enfileira mockFindMany: o bloqueio do almoço acontece antes de consultar conflitos
+  // no banco, então prisma.agendamentos.findMany nem chega a ser chamado.
+  await expect(
+    criar({ cliente_id: 2, servico_id: 5, data_hora: new Date("2026-08-19T12:00:00.000-03:00"), duracao_minutos: 30 }),
+  ).rejects.toThrow(/almoço/i);
+
+  expect(mockCreate).not.toHaveBeenCalled();
+});
+
+test("criar recusa agendamento que começa antes do almoço mas invade o horário (ex: 11:30 com 60min)", async () => {
+  await expect(
+    criar({ cliente_id: 2, servico_id: 5, data_hora: new Date("2026-08-19T11:30:00.000-03:00"), duracao_minutos: 60 }),
+  ).rejects.toThrow(/almoço/i);
+
+  expect(mockCreate).not.toHaveBeenCalled();
+});
+
 test("horariosDisponiveis exclui horários já ocupados mesmo sem profissional informado", async () => {
   mockServicoFindUniqueOrThrow.mockResolvedValueOnce({ duracao_minutos: 60 });
   mockFindMany.mockResolvedValueOnce([

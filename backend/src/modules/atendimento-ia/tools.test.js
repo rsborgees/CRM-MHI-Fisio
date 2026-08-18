@@ -176,6 +176,23 @@ test("consultarHorariosDisponiveis limita o retorno a 2 horários de exemplo, ma
   expect(resultado.total_disponivel).toBe(4);
 });
 
+test("consultarHorariosDisponiveis filtra por período do dia quando o cliente recusa os horários sugeridos e pede a tarde", async () => {
+  agendamentosService.horariosDisponiveis.mockResolvedValueOnce([
+    "2026-01-10T11:00:00.000Z", // 08:00 em SP (manhã)
+    "2026-01-10T12:00:00.000Z", // 09:00 em SP (manhã)
+    "2026-01-10T18:00:00.000Z", // 15:00 em SP (tarde)
+    "2026-01-10T19:00:00.000Z", // 16:00 em SP (tarde)
+  ]);
+
+  const resultado = await executarFerramenta(2, "consultarHorariosDisponiveis", {
+    data: "2026-01-10",
+    periodo_dia: "tarde",
+  });
+
+  expect(resultado.horarios).toEqual(["2026-01-10T15:00:00", "2026-01-10T16:00:00"]);
+  expect(resultado.total_disponivel).toBe(2);
+});
+
 test("consultarHorariosDisponiveis resolve serviço e profissional pelo nome", async () => {
   servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser" }]);
   profissionaisService.listar.mockResolvedValueOnce([{ id: 7, nome: "Ana" }]);

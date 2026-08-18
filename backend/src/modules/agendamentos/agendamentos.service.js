@@ -3,6 +3,24 @@ import { AppError } from "../../utils/AppError.js";
 import { intervaloDoAgendamento, intervalosSeSobrepoem } from "./conflito.js";
 import { gerarHorariosCandidatos } from "./disponibilidade.js";
 
+function horarioConfigurado(env, padrao) {
+  return process.env[env] || padrao;
+}
+
+// Bloqueio do almoço vale pra clínica inteira, independente de profissional — por isso não
+// entra na consulta de conflitos (que é por agendamento existente), é checado à parte.
+function intervaloDoAlmoco(data_hora) {
+  const [horaInicio, minInicio] = horarioConfigurado("HORARIO_ALMOCO_INICIO", "12:00").split(":").map(Number);
+  const [horaFim, minFim] = horarioConfigurado("HORARIO_ALMOCO_FIM", "13:00").split(":").map(Number);
+
+  const inicio = new Date(data_hora);
+  inicio.setHours(horaInicio, minInicio, 0, 0);
+  const fim = new Date(data_hora);
+  fim.setHours(horaFim, minFim, 0, 0);
+
+  return { inicio, fim };
+}
+
 export async function listar({ data, data_inicio, data_fim, profissional_id, cliente_id, status } = {}) {
   const where = {
     profissional_id: profissional_id ? Number(profissional_id) : undefined,
@@ -37,6 +55,10 @@ export async function buscarPorId(id) {
 
 async function verificarConflito({ profissional_id, data_hora, duracao_minutos, ignorarId }) {
   const intervaloNovo = intervaloDoAgendamento({ data_hora, duracao_minutos });
+
+  if (intervalosSeSobrepoem(intervaloNovo, intervaloDoAlmoco(data_hora))) {
+    throw new AppError("Não é possível agendar nesse horário: é o horário de almoço da clínica.", 409);
+  }
 
   // Sem profissional definido, o agendamento ocupa o recurso compartilhado da clínica —
   // precisa checar contra TODOS os agendamentos do horário, não só os do mesmo profissional,
@@ -114,9 +136,12 @@ export async function horariosDisponiveis({ servico_id, profissional_id, data })
   const candidatos = gerarHorariosCandidatos({
     data,
     duracaoMinutos: duracao_minutos,
-    horarioAbertura: process.env.HORARIO_ABERTURA || "09:00",
-    horarioFechamento: process.env.HORARIO_FECHAMENTO || "19:00",
+    horarioAbertura: horarioConfigurado("HORARIO_ABERTURA", "09:00"),
+    horarioFechamento: horarioConfigurado("HORARIO_FECHAMENTO", "19:00"),
+    horarioAlmocoInicio: horarioConfigurado("HORARIO_ALMOCO_INICIO", "12:00"),
+    horarioAlmocoFim: horarioConfigurado("HORARIO_ALMOCO_FIM", "13:00"),
     agendamentosExistentes,
+    agora: new Date(),
   });
 
   return candidatos.map((candidato) => candidato.toISOString());

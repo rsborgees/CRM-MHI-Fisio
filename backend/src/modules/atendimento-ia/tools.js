@@ -106,6 +106,14 @@ export const DEFINICOES_FERRAMENTAS = [
           type: "string",
           description: "nome exato do profissional desejado, se já escolhido",
         },
+        periodo_dia: {
+          type: "string",
+          enum: ["manha", "tarde", "noite"],
+          description:
+            "use quando o cliente pedir um período específico (de manhã / à tarde / à noite) OU quando ele " +
+            "recusar os horários já sugeridos e pedir outro período — chame a ferramenta de novo com este filtro " +
+            "em vez de repetir os mesmos horários de exemplo que ele já rejeitou.",
+        },
         hora_especifica: {
           type: "string",
           description:
@@ -234,7 +242,9 @@ async function resolverProfissionalPorServico(servico) {
   if (candidatas.length === 1) return candidatas[0];
   if (candidatas.length > 1) {
     throw new AppError(
-      `Mais de uma profissional atende ${servico.nome}. Pergunte ao cliente qual ele prefere: ${candidatas.map((p) => p.nome).join(", ")}.`,
+      `Mais de uma profissional atende ${servico.nome} (${candidatas.map((p) => p.nome).join(", ")}). Pergunte ao ` +
+        'cliente de forma aberta se ele tem preferência de profissional (ex: "Você tem alguma preferência de ' +
+        'profissional?") — não cite os nomes na pergunta, só informe quem atende se ele perguntar.',
       400,
     );
   }
@@ -263,6 +273,19 @@ function escolherHorariosSugeridos(horarios) {
   return [...redondos, ...restantes].slice(0, MAX_HORARIOS_SUGERIDOS);
 }
 
+// Sem isso, "consultarHorariosDisponiveis" sempre devolve os mesmos 2 primeiros horários do
+// dia (os mais cedo) não importa quantas vezes for chamada — se o cliente recusar e pedir a
+// tarde, a IA repetiria os mesmos horários de manhã por não ter como pedir um período diferente.
+const FILTROS_PERIODO_DIA = {
+  manha: (hora) => hora < 12,
+  tarde: (hora) => hora >= 12 && hora < 18,
+  noite: (hora) => hora >= 18,
+};
+
+function horaLocal(horarioUTC) {
+  return Number(paraDataHoraLocalISO(horarioUTC).slice(11, 13));
+}
+
 async function consultarHorariosDisponiveis(clienteId, argumentos) {
   const servico = await resolverServicoPorNome(argumentos.nome_servico);
   const profissional = await resolverProfissionalPorNome(argumentos.nome_profissional);
@@ -270,11 +293,14 @@ async function consultarHorariosDisponiveis(clienteId, argumentos) {
   // ou deixar o modelo inventar uma data.
   const data = argumentos.data || proximoDiaUtilISO();
 
-  const horarios = await agendamentosService.horariosDisponiveis({
+  const todosHorarios = await agendamentosService.horariosDisponiveis({
     servico_id: servico?.id,
     profissional_id: profissional?.id,
     data,
   });
+
+  const filtroPeriodo = FILTROS_PERIODO_DIA[argumentos.periodo_dia];
+  const horarios = filtroPeriodo ? todosHorarios.filter((horario) => filtroPeriodo(horaLocal(horario))) : todosHorarios;
 
   const resultado = {
     data,

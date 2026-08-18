@@ -47,6 +47,10 @@ const PALAVRAS_DE_INDISPONIBILIDADE = [
   "está completo",
   "já está ocupado",
   "esgotado",
+  "não está disponível",
+  "não estão disponíveis",
+  "não está livre",
+  "não temos esse horário",
 ];
 
 function pareceConfirmarAcaoSemFerramenta(texto, chamadasAnteriores) {
@@ -55,10 +59,13 @@ function pareceConfirmarAcaoSemFerramenta(texto, chamadasAnteriores) {
   const mencionaConfirmacao = PALAVRAS_DE_CONFIRMACAO.some((palavra) => texto.toLowerCase().includes(palavra));
   if (!mencionaConfirmacao) return false;
 
-  const chamouFerramentaDeAcao = chamadasAnteriores.some(({ chamada }) =>
-    FERRAMENTAS_DE_ACAO_EM_AGENDAMENTO.includes(chamada.nome),
+  // Precisa ter tido SUCESSO, não só sido chamada — senão uma tentativa que falhou (ex: erro de
+  // profissional ambíguo) já "libera" a IA pra afirmar sucesso numa resposta posterior sem
+  // nunca ter de fato criado o agendamento.
+  const chamouFerramentaDeAcaoComSucesso = chamadasAnteriores.some(
+    ({ chamada, resultado }) => FERRAMENTAS_DE_ACAO_EM_AGENDAMENTO.includes(chamada.nome) && !resultado?.erro,
   );
-  return !chamouFerramentaDeAcao;
+  return !chamouFerramentaDeAcaoComSucesso;
 }
 
 // Mesma ideia, na direção contrária: a IA nega disponibilidade sem nunca ter consultado a
@@ -77,10 +84,44 @@ function pareceNegarDisponibilidadeSemConsultar(texto, chamadasAnteriores) {
   return !consultouDisponibilidade;
 }
 
+// Casa "9h", "14h30" ou "10:00" — horários específicos que a IA estaria oferecendo como opção.
+const PADRAO_HORARIO = /\b([01]?\d|2[0-3])h([0-5]\d)?\b|\b([01]?\d|2[0-3]):[0-5]\d\b/g;
+
+// A IA (modelo local, não muito confiável) às vezes inventa horários de exemplo do nada, sem
+// nunca ter chamado consultarHorariosDisponiveis — ex: "pra amanhã tenho 9h e 14h disponíveis"
+// quando na verdade os horários livres eram outros. Só desconfia com 2+ menções: uma menção
+// isolada normalmente é a IA confirmando um horário único que o próprio cliente pediu, não
+// uma lista de opções sendo oferecida.
+function pareceOferecerHorariosSemConsultar(texto, chamadasAnteriores) {
+  if (!texto) return false;
+
+  const mencoesDeHorario = texto.match(PADRAO_HORARIO) ?? [];
+  if (mencoesDeHorario.length < 2) return false;
+
+  const consultouDisponibilidade = chamadasAnteriores.some(
+    ({ chamada }) => chamada.nome === "consultarHorariosDisponiveis",
+  );
+  return !consultouDisponibilidade;
+}
+
+// Mesma lógica pro preço: já vimos o modelo inventar um valor (e duração) totalmente errado
+// sem nunca ter chamado consultarServicosPrecos.
+function pareceInformarPrecoSemConsultar(texto, chamadasAnteriores) {
+  if (!texto) return false;
+
+  const mencionaPreco = /R\$\s*\d/.test(texto);
+  if (!mencionaPreco) return false;
+
+  const consultouPrecos = chamadasAnteriores.some(({ chamada }) => chamada.nome === "consultarServicosPrecos");
+  return !consultouPrecos;
+}
+
 function respostaPareceInventada(texto, chamadasAnteriores) {
   return (
     pareceConfirmarAcaoSemFerramenta(texto, chamadasAnteriores) ||
-    pareceNegarDisponibilidadeSemConsultar(texto, chamadasAnteriores)
+    pareceNegarDisponibilidadeSemConsultar(texto, chamadasAnteriores) ||
+    pareceOferecerHorariosSemConsultar(texto, chamadasAnteriores) ||
+    pareceInformarPrecoSemConsultar(texto, chamadasAnteriores)
   );
 }
 
@@ -153,9 +194,9 @@ async function obterRespostaDoAgente(clienteId, historico, instrucaoSistema) {
         {
           papel: "usuario",
           conteudo:
-            "[aviso do sistema, não é uma mensagem do cliente] Você afirmou uma informação (agendamento ou " +
-            "disponibilidade de horário) sem chamar a ferramenta correspondente. Chame agora a ferramenta certa " +
-            "antes de responder ao cliente.",
+            "[aviso do sistema, não é uma mensagem do cliente] Você afirmou uma informação (agendamento, preço/duração " +
+            "de serviço, ou horários disponíveis) sem chamar a ferramenta correspondente. Chame agora a ferramenta " +
+            "certa antes de responder ao cliente.",
         },
       ];
       continue;
