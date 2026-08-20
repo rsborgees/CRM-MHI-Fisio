@@ -33,8 +33,8 @@ function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-brand">
-          <span className="brand-mark">EP</span>
-          <h1>CRM Estetic Premium</h1>
+          <span className="brand-mark">MHI</span>
+          <h1>CRM MHI Fisio</h1>
           <p>Entre com sua conta para continuar</p>
         </div>
 

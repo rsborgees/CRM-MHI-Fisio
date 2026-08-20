@@ -1,15 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
 
 :root {
-  /* Paleta branco + dourado do site */
+  /* Paleta verde + branco do site */
   --color-background: #fafaf9;
   --color-surface: #ffffff;
   --color-foreground: #1c1917;
   --color-muted: #78716c;
   --color-border: #e7e3de;
-  --color-gold: #c7a54a;
-  --color-gold-hover: #b3903a;
-  --color-on-gold: #1c1917;
+  --color-primary: #0f7a49;
+  --color-primary-hover: #0c5f39;
+  --color-on-primary: #ffffff;
   --color-destructive: #dc2626;
 
   --font-heading: 'Playfair Display', serif;
@@ -56,8 +56,8 @@ input {
 }
 
 .btn-primary {
-  background: var(--color-gold);
-  color: var(--color-on-gold);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   border: none;
   border-radius: 8px;
   padding: 12px 20px;
@@ -68,7 +68,7 @@ input {
 }
 
 .btn-primary:hover {
-  background: var(--color-gold-hover);
+  background: var(--color-primary-hover);
 }
 
 .btn-primary:active {
@@ -76,7 +76,7 @@ input {
 }
 
 .btn-primary:focus-visible {
-  outline: 2px solid var(--color-gold);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -94,7 +94,7 @@ input {
 
 .btn-secondary:hover {
   background: var(--color-background);
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
 }
 
 .btn-danger {
@@ -127,8 +127,8 @@ input {
 
 .input-field:focus-visible {
   outline: none;
-  border-color: var(--color-gold);
-  box-shadow: 0 0 0 3px rgba(199, 165, 74, 0.25);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(15, 122, 73, 0.25);
 }
 
 .input-field::placeholder {

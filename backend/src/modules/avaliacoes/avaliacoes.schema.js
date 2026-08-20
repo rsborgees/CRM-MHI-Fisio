@@ -9,8 +9,10 @@ export const criarAvaliacaoSchema = z.object({
   altura: numeroOpcional(z.coerce.number().positive()),
   imc: numeroOpcional(z.coerce.number().positive()),
   medidas: z.record(z.string(), z.any()).optional(),
-  obs_pele: z.string().optional(),
-  obs_corporal: z.string().optional(),
+  queixa_principal: z.string().optional(),
+  diagnostico_fisioterapeutico: z.string().optional(),
+  escala_dor: numeroOpcional(z.coerce.number().int().min(0).max(10)),
+  avaliacao_postural: z.string().optional(),
   recomendacoes: z.string().optional(),
   responsavel_id: numeroOpcional(z.coerce.number().int()),
 });

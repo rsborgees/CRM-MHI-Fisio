@@ -22,7 +22,7 @@
 }
 
 .kpi-card-destaque {
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
   background: rgba(199, 165, 74, 0.06);
 }
 

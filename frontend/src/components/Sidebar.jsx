@@ -43,8 +43,8 @@ function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand" title="Estetic Premium">
-        <span className="brand-mark">EP</span>
+      <div className="sidebar-brand" title="MHI Fisio">
+        <span className="brand-mark">MHI</span>
       </div>
 
       <nav className="sidebar-nav">

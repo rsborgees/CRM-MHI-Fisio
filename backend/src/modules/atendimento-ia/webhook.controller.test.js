@@ -73,11 +73,11 @@ test("converte negrito estilo Markdown (**texto**) pro formato do WhatsApp (*tex
       texto: "não deveria ser usado",
       chamadasDeFerramenta: [{ id: "1", nome: "consultarServicosPrecos", argumentos: {} }],
     })
-    .mockResolvedValueOnce({ texto: "Temos **Depilação a Laser** por R$250.", chamadasDeFerramenta: [] });
+    .mockResolvedValueOnce({ texto: "Temos **Sessão de Fisioterapia** por R$250.", chamadasDeFerramenta: [] });
 
   await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quais servicos?" });
 
-  expect(enviarMensagem).toHaveBeenCalledWith("5511999999999", "Temos *Depilação a Laser* por R$250.");
+  expect(enviarMensagem).toHaveBeenCalledWith("5511999999999", "Temos *Sessão de Fisioterapia* por R$250.");
 });
 
 test("manda cada parágrafo da resposta como uma mensagem separada no WhatsApp, em vez de uma só com quebras de linha", async () => {
@@ -300,7 +300,7 @@ test("quando o agendamento é criado com sucesso, a confirmação é montada pel
       {
         id: "1",
         nome: "criarAgendamento",
-        argumentos: { nome_servico: "Depilação a Laser", data_hora: "2026-08-18T10:00:00" },
+        argumentos: { nome_servico: "Sessão de Fisioterapia", data_hora: "2026-08-18T10:00:00" },
       },
     ],
   });
@@ -308,12 +308,12 @@ test("quando o agendamento é criado com sucesso, a confirmação é montada pel
     id: 1,
     status: "agendado",
     data_hora: "2026-08-18T13:00:00.000Z",
-    servico: "Depilação a Laser",
+    servico: "Sessão de Fisioterapia",
   });
 
   const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
 
-  expect(resultado).toContain("Depilação a Laser");
+  expect(resultado).toContain("Sessão de Fisioterapia");
   expect(resultado).not.toBe("não deveria ser usado");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(1);
 });
@@ -324,19 +324,19 @@ test("pede correção quando a IA confirma um agendamento sem chamar a ferrament
     .mockResolvedValueOnce({
       texto: "não deveria ser usado",
       chamadasDeFerramenta: [
-        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Depilação a Laser", data_hora: "2026-08-18T10:00:00" } },
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Sessão de Fisioterapia", data_hora: "2026-08-18T10:00:00" } },
       ],
     });
   executarFerramenta.mockResolvedValueOnce({
     id: 1,
     status: "agendado",
     data_hora: "2026-08-18T13:00:00.000Z",
-    servico: "Depilação a Laser",
+    servico: "Sessão de Fisioterapia",
   });
 
   const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
 
-  expect(resultado).toContain("Depilação a Laser");
+  expect(resultado).toContain("Sessão de Fisioterapia");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
 });
 
@@ -345,7 +345,7 @@ test("pede correção quando criarAgendamento falha (ex: profissional ambíguo) 
     .mockResolvedValueOnce({
       texto: "não deveria ser usado",
       chamadasDeFerramenta: [
-        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Depilação a Laser", data_hora: "2026-08-19T15:00:00" } },
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Sessão de Fisioterapia", data_hora: "2026-08-19T15:00:00" } },
       ],
     })
     .mockResolvedValueOnce({
@@ -358,18 +358,18 @@ test("pede correção quando criarAgendamento falha (ex: profissional ambíguo) 
         {
           id: "2",
           nome: "criarAgendamento",
-          argumentos: { nome_servico: "Depilação a Laser", data_hora: "2026-08-19T15:00:00", nome_profissional: "Larissa" },
+          argumentos: { nome_servico: "Sessão de Fisioterapia", data_hora: "2026-08-19T15:00:00", nome_profissional: "Larissa" },
         },
       ],
     });
   executarFerramenta
-    .mockResolvedValueOnce({ erro: "Mais de uma profissional atende Depilação a Laser. Pergunte ao cliente..." })
-    .mockResolvedValueOnce({ id: 1, status: "agendado", data_hora: "2026-08-19T18:00:00.000Z", servico: "Depilação a Laser" });
+    .mockResolvedValueOnce({ erro: "Mais de uma profissional atende Sessão de Fisioterapia. Pergunte ao cliente..." })
+    .mockResolvedValueOnce({ id: 1, status: "agendado", data_hora: "2026-08-19T18:00:00.000Z", servico: "Sessão de Fisioterapia" });
 
   const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
 
   expect(resultado).not.toBe("Fechado, ficou pra amanhã às 15h, depilação a laser.");
-  expect(resultado).toContain("Depilação a Laser");
+  expect(resultado).toContain("Sessão de Fisioterapia");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(3);
 });
 
@@ -391,48 +391,48 @@ test("pede correção quando a IA diz que registrou o nome do cliente sem chamar
 
 test("pede correção quando a IA diz 'realizado com sucesso' sem chamar a ferramenta (variação de palavra não coberta antes)", async () => {
   llmClient.gerarResposta
-    .mockResolvedValueOnce({ texto: "Agendamento realizado com sucesso: Radiofrequência Facial às 16h.", chamadasDeFerramenta: [] })
+    .mockResolvedValueOnce({ texto: "Agendamento realizado com sucesso: RPG às 16h.", chamadasDeFerramenta: [] })
     .mockResolvedValueOnce({
       texto: "não deveria ser usado",
       chamadasDeFerramenta: [
-        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Radiofrequência Facial", data_hora: "2026-08-17T16:00:00" } },
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "RPG", data_hora: "2026-08-17T16:00:00" } },
       ],
     });
   executarFerramenta.mockResolvedValueOnce({
     id: 1,
     status: "agendado",
     data_hora: "2026-08-17T19:00:00.000Z",
-    servico: "Radiofrequência Facial",
+    servico: "RPG",
   });
 
   const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
 
-  expect(resultado).toContain("Radiofrequência Facial");
+  expect(resultado).toContain("RPG");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
 });
 
 test("pede correção quando a IA diz 'Fechado!' sem chamar a ferramenta (variação de palavra não coberta antes)", async () => {
   llmClient.gerarResposta
     .mockResolvedValueOnce({
-      texto: "Fechado! Seu horário ficou para amanhã, dia 19/08, às 9h, para Radiofrequência. 😊 Te esperamos aqui!",
+      texto: "Fechado! Seu horário ficou para amanhã, dia 19/08, às 9h, para RPG. 😊 Te esperamos aqui!",
       chamadasDeFerramenta: [],
     })
     .mockResolvedValueOnce({
       texto: "não deveria ser usado",
       chamadasDeFerramenta: [
-        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "Radiofrequência Facial", data_hora: "2026-08-19T09:00:00" } },
+        { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "RPG", data_hora: "2026-08-19T09:00:00" } },
       ],
     });
   executarFerramenta.mockResolvedValueOnce({
     id: 1,
     status: "agendado",
     data_hora: "2026-08-19T12:00:00.000Z",
-    servico: "Radiofrequência Facial",
+    servico: "RPG",
   });
 
   const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
 
-  expect(resultado).toContain("Radiofrequência Facial");
+  expect(resultado).toContain("RPG");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(2);
 });
 
@@ -487,7 +487,7 @@ test("pede correção quando a IA oferece horários específicos sem nunca ter c
       chamadasDeFerramenta: [{ id: "0", nome: "consultarServicosPrecos", argumentos: {} }],
     })
     .mockResolvedValueOnce({
-      texto: "A Radiofrequência Facial custa R$ 160 e dura cerca de 45 minutos.\n\nPara amanhã tenho 9h e 14h disponíveis, qual fica melhor?",
+      texto: "A RPG custa R$ 160 e dura cerca de 45 minutos.\n\nPara amanhã tenho 9h e 14h disponíveis, qual fica melhor?",
       chamadasDeFerramenta: [],
     })
     .mockResolvedValueOnce({
@@ -556,7 +556,7 @@ test("não bloqueia quando a IA nega disponibilidade depois de realmente ter con
 
 test("junta mensagens picotadas (mandadas em sequência) numa única resposta, em vez de responder a cada pedaço", async () => {
   llmClient.gerarResposta.mockResolvedValueOnce({
-    texto: "Oi! Radiofrequência facial pra amanhã de manhã, já vejo os horários pra você.",
+    texto: "Oi! RPG pra amanhã de manhã, já vejo os horários pra você.",
     chamadasDeFerramenta: [],
   });
 

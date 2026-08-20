@@ -7,7 +7,7 @@
 }
 
 .voltar-link:hover {
-  color: var(--color-gold);
+  color: var(--color-primary);
 }
 
 .perfil-header {
@@ -60,7 +60,7 @@
 .perfil-timeline li {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-gold);
+  border-left: 3px solid var(--color-primary);
   border-radius: 8px;
   padding: 12px 16px;
 }
@@ -74,7 +74,7 @@
 .perfil-timeline-tipo {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-gold);
+  color: var(--color-primary);
   text-transform: uppercase;
 }
 

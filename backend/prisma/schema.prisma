@@ -30,21 +30,23 @@ model agendamentos {
 }
 
 model avaliacoes {
-  id             Int            @id @default(autoincrement())
-  cliente_id     Int
-  agendamento_id Int?
-  data           DateTime       @default(now()) @db.Timestamp(6)
-  peso           Decimal?       @db.Decimal(6, 2)
-  altura         Decimal?       @db.Decimal(6, 2)
-  imc            Decimal?       @db.Decimal(6, 2)
-  medidas        Json?
-  obs_pele       String?
-  obs_corporal   String?
-  recomendacoes  String?
-  responsavel_id Int?
-  agendamentos   agendamentos?  @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  clientes       clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  profissionais  profissionais? @relation(fields: [responsavel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                           Int            @id @default(autoincrement())
+  cliente_id                   Int
+  agendamento_id               Int?
+  data                         DateTime       @default(now()) @db.Timestamp(6)
+  peso                         Decimal?       @db.Decimal(6, 2)
+  altura                       Decimal?       @db.Decimal(6, 2)
+  imc                          Decimal?       @db.Decimal(6, 2)
+  medidas                      Json?
+  queixa_principal             String?
+  diagnostico_fisioterapeutico String?
+  escala_dor                   Int?           @db.SmallInt
+  avaliacao_postural           String?
+  recomendacoes                String?
+  responsavel_id               Int?
+  agendamentos                 agendamentos?  @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                     clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profissionais                profissionais? @relation(fields: [responsavel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model clientes {

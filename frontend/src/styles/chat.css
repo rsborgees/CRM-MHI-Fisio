@@ -28,7 +28,7 @@
 
 .chat-bolha-assistente {
   align-self: flex-end;
-  background: var(--color-gold);
-  color: var(--color-on-gold);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   border-bottom-right-radius: 2px;
 }

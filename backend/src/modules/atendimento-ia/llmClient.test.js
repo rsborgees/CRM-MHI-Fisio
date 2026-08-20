@@ -77,7 +77,7 @@ test("gerarResposta extrai a chamada de ferramenta mesmo quando há prosa antes 
       {
         message: {
           content:
-            'Aguarde um momento, vou verificar.\n\n{"name": "criarAgendamento", "arguments": {"nome_servico": "Depilação a Laser", "data_hora": "2026-08-18T10:00:00"}}',
+            'Aguarde um momento, vou verificar.\n\n{"name": "criarAgendamento", "arguments": {"nome_servico": "Sessão de Fisioterapia", "data_hora": "2026-08-18T10:00:00"}}',
           tool_calls: [],
         },
       },
@@ -89,7 +89,7 @@ test("gerarResposta extrai a chamada de ferramenta mesmo quando há prosa antes 
   expect(resultado.chamadasDeFerramenta).toHaveLength(1);
   expect(resultado.chamadasDeFerramenta[0].nome).toBe("criarAgendamento");
   expect(resultado.chamadasDeFerramenta[0].argumentos).toEqual({
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-08-18T10:00:00",
   });
 });

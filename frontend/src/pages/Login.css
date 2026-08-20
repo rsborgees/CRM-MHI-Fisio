@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: linear-gradient(180deg, var(--color-background) 0%, #f3ede1 100%);
+  background: linear-gradient(180deg, var(--color-background) 0%, #e6f2ea 100%);
 }
 
 .login-card {
@@ -29,10 +29,11 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--color-gold);
-  color: var(--color-on-gold);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   font-family: var(--font-heading);
-  font-size: 20px;
+  font-size: 15px;
+  letter-spacing: 0.2px;
   margin-bottom: 16px;
 }
 

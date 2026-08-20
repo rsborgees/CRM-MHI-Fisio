@@ -89,7 +89,7 @@
 }
 
 .tabela-link:hover {
-  color: var(--color-gold);
+  color: var(--color-primary);
   text-decoration: underline;
 }
 
@@ -113,8 +113,8 @@
 }
 
 .status-badge-novo_contato {
-  background: rgba(199, 165, 74, 0.15);
-  color: #92700f;
+  background: rgba(217, 119, 6, 0.15);
+  color: #b45309;
 }
 
 .status-select {

@@ -34,16 +34,16 @@ beforeEach(() => {
 
 test("criarAgendamento resolve o serviço pelo nome (não pede id numérico ao modelo)", async () => {
   servicosService.listar.mockResolvedValueOnce([
-    { id: 5, nome: "Depilação a Laser", duracao_minutos: 30 },
+    { id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 },
   ]);
 
   await executarFerramenta(2, "criarAgendamento", {
     cliente_id: 999,
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
-  expect(servicosService.listar).toHaveBeenCalledWith({ busca: "Depilação a Laser", ativo: "true" });
+  expect(servicosService.listar).toHaveBeenCalledWith({ busca: "Sessão de Fisioterapia", ativo: "true" });
   expect(agendamentosService.criar).toHaveBeenCalledWith(
     expect.objectContaining({ cliente_id: 2, servico_id: 5, duracao_minutos: 30 }),
   );
@@ -52,18 +52,18 @@ test("criarAgendamento resolve o serviço pelo nome (não pede id numérico ao m
 test("criarAgendamento devolve erro com a lista de serviços válidos quando o nome não é encontrado", async () => {
   servicosService.listar.mockResolvedValueOnce([]);
   servicosService.listar.mockResolvedValueOnce([
-    { id: 4, nome: "Radiofrequência Facial" },
-    { id: 5, nome: "Depilação a Laser" },
+    { id: 4, nome: "RPG" },
+    { id: 5, nome: "Sessão de Fisioterapia" },
   ]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Botox",
+    nome_servico: "Pilates Clínico",
     data_hora: "2026-01-10T10:00:00",
   });
 
-  expect(resultado.erro).toContain("Botox");
-  expect(resultado.erro).toContain("Radiofrequência Facial");
-  expect(resultado.erro).toContain("Depilação a Laser");
+  expect(resultado.erro).toContain("Pilates Clínico");
+  expect(resultado.erro).toContain("RPG");
+  expect(resultado.erro).toContain("Sessão de Fisioterapia");
   expect(agendamentosService.criar).not.toHaveBeenCalled();
 });
 
@@ -203,12 +203,12 @@ test("consultarHorariosDisponiveis filtra por período do dia quando o cliente r
 });
 
 test("consultarHorariosDisponiveis resolve serviço e profissional pelo nome", async () => {
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser" }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia" }]);
   profissionaisService.listar.mockResolvedValueOnce([{ id: 7, nome: "Ana" }]);
 
   await executarFerramenta(2, "consultarHorariosDisponiveis", {
     data: "2026-01-10",
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     nome_profissional: "Ana",
   });
 
@@ -230,7 +230,7 @@ test("cancelarAgendamento recusa quando o cliente não tem nenhum agendamento at
 
 test("cancelarAgendamento funciona quando há só um agendamento ativo, sem precisar dizer o serviço", async () => {
   agendamentosService.listar.mockResolvedValueOnce([
-    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-10T10:00:00.000Z", servicos: { nome: "Depilação a Laser" } },
+    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-10T10:00:00.000Z", servicos: { nome: "Sessão de Fisioterapia" } },
   ]);
   agendamentosService.atualizar.mockResolvedValueOnce({ id: 10, status: "cancelado" });
 
@@ -240,15 +240,15 @@ test("cancelarAgendamento funciona quando há só um agendamento ativo, sem prec
     id: 10,
     status: "cancelado",
     data_hora: "2026-01-10T10:00:00.000Z",
-    servico: "Depilação a Laser",
+    servico: "Sessão de Fisioterapia",
   });
   expect(agendamentosService.atualizar).toHaveBeenCalledWith(10, { status: "cancelado" });
 });
 
 test("cancelarAgendamento pede pra especificar o serviço quando há mais de um agendamento ativo", async () => {
   agendamentosService.listar.mockResolvedValueOnce([
-    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-10T10:00:00.000Z", servicos: { nome: "Depilação a Laser" } },
-    { id: 11, cliente_id: 2, status: "agendado", data_hora: "2026-01-11T10:00:00.000Z", servicos: { nome: "Radiofrequência Facial" } },
+    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-10T10:00:00.000Z", servicos: { nome: "Sessão de Fisioterapia" } },
+    { id: 11, cliente_id: 2, status: "agendado", data_hora: "2026-01-11T10:00:00.000Z", servicos: { nome: "RPG" } },
   ]);
 
   const resultado = await executarFerramenta(2, "cancelarAgendamento", {});
@@ -259,10 +259,10 @@ test("cancelarAgendamento pede pra especificar o serviço quando há mais de um 
 
 test("criarAgendamento recusa quando o cliente ainda não tem nome cadastrado (só o placeholder do WhatsApp)", async () => {
   clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Cliente WhatsApp 5511999999999", nome_confirmado: false });
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
@@ -272,10 +272,10 @@ test("criarAgendamento recusa quando o cliente ainda não tem nome cadastrado (s
 
 test("criarAgendamento recusa quando o nome veio só do pushName do WhatsApp e o cliente nunca confirmou (reproduz caso real)", async () => {
   clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Rafaella", nome_confirmado: false });
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
@@ -284,14 +284,14 @@ test("criarAgendamento recusa quando o nome veio só do pushName do WhatsApp e o
 });
 
 test("criarAgendamento agenda automaticamente com a única profissional que atende o serviço", async () => {
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
   profissionaisService.listar.mockResolvedValueOnce([
     { id: 2, nome: "Larissa", servicosAtendidos: [{ id: 5 }] },
     { id: 3, nome: "Pedro", servicosAtendidos: [{ id: 9 }] },
   ]);
 
   await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
@@ -299,14 +299,14 @@ test("criarAgendamento agenda automaticamente com a única profissional que aten
 });
 
 test("criarAgendamento pede pra perguntar a preferência quando mais de uma profissional atende o serviço", async () => {
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
   profissionaisService.listar.mockResolvedValueOnce([
     { id: 2, nome: "Larissa", servicosAtendidos: [{ id: 5 }] },
     { id: 3, nome: "Pedro", servicosAtendidos: [{ id: 5 }] },
   ]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
@@ -316,7 +316,7 @@ test("criarAgendamento pede pra perguntar a preferência quando mais de uma prof
 });
 
 test("criarAgendamento recusa quando a profissional nomeada não atende o serviço", async () => {
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
   profissionaisService.listar
     .mockResolvedValueOnce([{ id: 3, nome: "Pedro", servicosAtendidos: [{ id: 9 }] }])
     .mockResolvedValueOnce([
@@ -325,7 +325,7 @@ test("criarAgendamento recusa quando a profissional nomeada não atende o servi�
     ]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     nome_profissional: "Pedro",
     data_hora: "2026-01-10T10:00:00",
   });
@@ -336,11 +336,11 @@ test("criarAgendamento recusa quando a profissional nomeada não atende o servi�
 });
 
 test("criarAgendamento segue sem profissional quando nenhuma está vinculada ao serviço ainda", async () => {
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
   profissionaisService.listar.mockResolvedValueOnce([{ id: 2, nome: "Larissa", servicosAtendidos: [] }]);
 
   await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
@@ -348,22 +348,22 @@ test("criarAgendamento segue sem profissional quando nenhuma está vinculada ao 
 });
 
 test("criarAgendamento devolve o nome do serviço no resultado (pra montar a confirmação sem depender do modelo)", async () => {
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Depilação a Laser", duracao_minutos: 30 }]);
+  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
-    nome_servico: "Depilação a Laser",
+    nome_servico: "Sessão de Fisioterapia",
     data_hora: "2026-01-10T10:00:00",
   });
 
   expect(resultado).toEqual(
-    expect.objectContaining({ id: 1, status: "agendado", servico: "Depilação a Laser" }),
+    expect.objectContaining({ id: 1, status: "agendado", servico: "Sessão de Fisioterapia" }),
   );
 });
 
 test("remarcarAgendamento resolve o agendamento certo pelo nome do serviço quando há mais de um ativo", async () => {
   agendamentosService.listar.mockResolvedValueOnce([
-    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-09T10:00:00.000Z", servicos: { nome: "Depilação a Laser" } },
-    { id: 11, cliente_id: 2, status: "agendado", data_hora: "2026-01-10T10:00:00.000Z", servicos: { nome: "Radiofrequência Facial" } },
+    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-09T10:00:00.000Z", servicos: { nome: "Sessão de Fisioterapia" } },
+    { id: 11, cliente_id: 2, status: "agendado", data_hora: "2026-01-10T10:00:00.000Z", servicos: { nome: "RPG" } },
   ]);
   agendamentosService.atualizar.mockResolvedValueOnce({
     id: 11,
@@ -372,27 +372,27 @@ test("remarcarAgendamento resolve o agendamento certo pelo nome do serviço quan
   });
 
   const resultado = await executarFerramenta(2, "remarcarAgendamento", {
-    nome_servico: "Radiofrequência Facial",
+    nome_servico: "RPG",
     data_hora: "2026-01-15T10:00:00",
   });
 
   expect(agendamentosService.atualizar).toHaveBeenCalledWith(11, { data_hora: new Date("2026-01-15T10:00:00") });
   expect(resultado).toEqual(
-    expect.objectContaining({ id: 11, status: "agendado", servico: "Radiofrequência Facial" }),
+    expect.objectContaining({ id: 11, status: "agendado", servico: "RPG" }),
   );
 });
 
 test("remarcarAgendamento recusa quando não encontra agendamento ativo pro serviço informado", async () => {
   agendamentosService.listar.mockResolvedValueOnce([
-    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-09T10:00:00.000Z", servicos: { nome: "Depilação a Laser" } },
+    { id: 10, cliente_id: 2, status: "agendado", data_hora: "2026-01-09T10:00:00.000Z", servicos: { nome: "Sessão de Fisioterapia" } },
   ]);
 
   const resultado = await executarFerramenta(2, "remarcarAgendamento", {
-    nome_servico: "Radiofrequência Facial",
+    nome_servico: "RPG",
     data_hora: "2026-01-15T10:00:00",
   });
 
-  expect(resultado.erro).toContain("Radiofrequência Facial");
+  expect(resultado.erro).toContain("RPG");
   expect(agendamentosService.atualizar).not.toHaveBeenCalled();
 });
 
