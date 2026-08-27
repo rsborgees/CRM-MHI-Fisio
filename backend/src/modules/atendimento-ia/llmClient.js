@@ -6,6 +6,10 @@ const cliente = new OpenAI({
 });
 
 const MODELO = process.env.LLM_MODEL || "deepseek-chat";
+// Modelos de raciocínio (ex: gpt-5.x) recusam function calling em /chat/completions a menos
+// que reasoning_effort seja "none" — fica opcional porque outros provedores (Ollama, modelos
+// sem essa opção) rejeitam um parâmetro que não reconhecem.
+const REASONING_EFFORT = process.env.LLM_REASONING_EFFORT || undefined;
 
 function montarMensagens(mensagens, chamadasAnteriores, instrucaoSistema) {
   const resultado = [{ role: "system", content: instrucaoSistema }];
@@ -88,6 +92,7 @@ export async function gerarResposta({ mensagens, ferramentas, chamadasAnteriores
     model: MODELO,
     messages: montarMensagens(mensagens, chamadasAnteriores, instrucaoSistema),
     tools,
+    ...(REASONING_EFFORT ? { reasoning_effort: REASONING_EFFORT } : {}),
   });
 
   const mensagemResposta = resposta.choices[0].message;

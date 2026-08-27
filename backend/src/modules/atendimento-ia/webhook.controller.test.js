@@ -31,6 +31,8 @@ jest.unstable_mockModule("./tools.js", () => ({
   DEFINICOES_FERRAMENTAS: [],
   gerarInstrucaoSistema: jest.fn().mockReturnValue("instrucao de teste"),
   executarFerramenta: jest.fn().mockResolvedValue({ ok: true }),
+  formatarHoraLocal: jest.fn().mockReturnValue("10h"),
+  formatarDataCompletaLocal: jest.fn().mockReturnValue("sexta-feira, 28/08"),
 }));
 
 jest.unstable_mockModule("./llmClient.js", () => ({
@@ -316,6 +318,50 @@ test("quando o agendamento é criado com sucesso, a confirmação é montada pel
   expect(resultado).toContain("Sessão de Fisioterapia");
   expect(resultado).not.toBe("não deveria ser usado");
   expect(llmClient.gerarResposta).toHaveBeenCalledTimes(1);
+});
+
+test("confirmação de criarAgendamento usa o template com emoji, nome, dia, hora e preço reais", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({
+    texto: "não deveria ser usado",
+    chamadasDeFerramenta: [
+      { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "RPG", data_hora: "2026-08-28T09:00:00" } },
+    ],
+  });
+  executarFerramenta.mockResolvedValueOnce({
+    id: 1,
+    status: "agendado",
+    data_hora: "2026-08-28T12:00:00.000Z",
+    servico: "RPG",
+    preco: "120",
+    nome_cliente: "Juliana Andrade Souza",
+  });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).toBe(
+    "Perfeito, Juliana! 💙 Seu agendamento está confirmado:\n" +
+      "📅 sexta-feira, 28/08\n" +
+      "🕗 10h\n" +
+      "🩺 RPG\n" +
+      "💰 R$ 120\n" +
+      "Esperamos você na MHI Fisio! 😊",
+  );
+});
+
+test("confirmação de criarAgendamento não quebra sem nome ou preço (mocks parciais)", async () => {
+  llmClient.gerarResposta.mockResolvedValueOnce({
+    texto: "não deveria ser usado",
+    chamadasDeFerramenta: [
+      { id: "1", nome: "criarAgendamento", argumentos: { nome_servico: "RPG", data_hora: "2026-08-28T09:00:00" } },
+    ],
+  });
+  executarFerramenta.mockResolvedValueOnce({ id: 1, status: "agendado", data_hora: "2026-08-28T12:00:00.000Z", servico: "RPG" });
+
+  const resultado = await processarMensagemRecebida({ telefone: "5511999999999", mensagem: "quero agendar" });
+
+  expect(resultado).toBe(
+    "Perfeito! 💙 Seu agendamento está confirmado:\n📅 sexta-feira, 28/08\n🕗 10h\n🩺 RPG\nEsperamos você na MHI Fisio! 😊",
+  );
 });
 
 test("pede correção quando a IA confirma um agendamento sem chamar a ferramenta, e usa a confirmação determinística da chamada real que vem depois", async () => {

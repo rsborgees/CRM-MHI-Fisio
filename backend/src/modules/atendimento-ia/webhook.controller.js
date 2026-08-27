@@ -3,7 +3,13 @@ import * as conversasService from "./conversas.service.js";
 import * as configuracaoService from "./configuracao.service.js";
 import { gerarResumoCliente } from "./resumoCliente.js";
 import * as llmClient from "./llmClient.js";
-import { DEFINICOES_FERRAMENTAS, gerarInstrucaoSistema, executarFerramenta } from "./tools.js";
+import {
+  DEFINICOES_FERRAMENTAS,
+  gerarInstrucaoSistema,
+  executarFerramenta,
+  formatarHoraLocal,
+  formatarDataCompletaLocal,
+} from "./tools.js";
 import { enviarMensagem } from "./evolutionApi.js";
 
 const MAX_ITERACOES_FERRAMENTA = 5;
@@ -144,10 +150,34 @@ function formatarDataHora(dataHora) {
   });
 }
 
+function formatarPreco(preco) {
+  if (preco == null) return null;
+  const numero = Number(preco);
+  return Number.isInteger(numero) ? String(numero) : numero.toFixed(2).replace(".", ",");
+}
+
 // A data/hora que o cliente vê precisa vir sempre do banco, nunca da IA reescrevendo de
 // memória — um modelo pequeno já confirmou "amanhã às 13h" quando o que foi salvo de fato
 // era outro dia. Isso monta a confirmação a partir do resultado real da ferramenta.
+//
+// criarAgendamento usa o template com emoji (mesmo formato descrito no prompt) — é o momento
+// de maior valor pro cliente, vale a mensagem mais bonita. Ainda assim, todo dado nela (nome,
+// dia, hora, serviço, preço) vem do resultado real da ferramenta, nunca da IA.
 function montarConfirmacaoDeterministica(nomeFerramenta, resultado) {
+  if (nomeFerramenta === "criarAgendamento") {
+    const primeiroNome = resultado.nome_cliente?.split(" ")[0] || "";
+    const precoFormatado = formatarPreco(resultado.preco);
+
+    return (
+      `Perfeito${primeiroNome ? `, ${primeiroNome}` : ""}! 💙 Seu agendamento está confirmado:\n` +
+      `📅 ${formatarDataCompletaLocal(resultado.data_hora)}\n` +
+      `🕗 ${formatarHoraLocal(resultado.data_hora)}\n` +
+      `🩺 ${resultado.servico ?? "Sessão"}\n` +
+      (precoFormatado ? `💰 R$ ${precoFormatado}\n` : "") +
+      `Esperamos você na MHI Fisio! 😊`
+    );
+  }
+
   const rotulo = MENSAGENS_DE_ACAO[nomeFerramenta];
   if (!rotulo) return null;
 

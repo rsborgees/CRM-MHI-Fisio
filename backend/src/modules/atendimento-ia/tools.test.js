@@ -22,10 +22,15 @@ jest.unstable_mockModule("../profissionais/profissionais.service.js", () => ({
   listar: jest.fn().mockResolvedValue([]),
 }));
 
+jest.unstable_mockModule("../pagamentos/pagamentos.service.js", () => ({
+  criar: jest.fn().mockResolvedValue({ id: 1 }),
+}));
+
 const agendamentosService = await import("../agendamentos/agendamentos.service.js");
 const clientesService = await import("../clientes/clientes.service.js");
 const servicosService = await import("../servicos/servicos.service.js");
 const profissionaisService = await import("../profissionais/profissionais.service.js");
+const pagamentosService = await import("../pagamentos/pagamentos.service.js");
 const { executarFerramenta, gerarInstrucaoSistema } = await import("./tools.js");
 
 beforeEach(() => {
@@ -258,8 +263,10 @@ test("cancelarAgendamento pede pra especificar o serviço quando há mais de um 
 });
 
 test("criarAgendamento recusa quando o cliente ainda não tem nome cadastrado (só o placeholder do WhatsApp)", async () => {
+  // Não configura servicosService.listar aqui: a checagem de nome_confirmado acontece antes de
+  // resolver o serviço, então esse mock nunca seria consumido — deixá-lo "pendurado" vazava pro
+  // próximo teste que chamasse listar, mascarado só porque coincidia com o valor que eles já usavam.
   clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Cliente WhatsApp 5511999999999", nome_confirmado: false });
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
     nome_servico: "Sessão de Fisioterapia",
@@ -272,7 +279,6 @@ test("criarAgendamento recusa quando o cliente ainda não tem nome cadastrado (s
 
 test("criarAgendamento recusa quando o nome veio só do pushName do WhatsApp e o cliente nunca confirmou (reproduz caso real)", async () => {
   clientesService.buscarPorId.mockResolvedValueOnce({ id: 2, nome: "Rafaella", nome_confirmado: false });
-  servicosService.listar.mockResolvedValueOnce([{ id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30 }]);
 
   const resultado = await executarFerramenta(2, "criarAgendamento", {
     nome_servico: "Sessão de Fisioterapia",
@@ -358,6 +364,85 @@ test("criarAgendamento devolve o nome do serviço no resultado (pra montar a con
   expect(resultado).toEqual(
     expect.objectContaining({ id: 1, status: "agendado", servico: "Sessão de Fisioterapia" }),
   );
+});
+
+test("criarAgendamento lança o valor do serviço como pagamento pendente", async () => {
+  servicosService.listar.mockResolvedValueOnce([
+    { id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30, preco: "120" },
+  ]);
+
+  await executarFerramenta(2, "criarAgendamento", {
+    nome_servico: "Sessão de Fisioterapia",
+    data_hora: "2026-01-10T10:00:00",
+    forma_pagamento: "pix",
+  });
+
+  expect(pagamentosService.criar).toHaveBeenCalledWith({
+    cliente_id: 2,
+    agendamento_id: 1,
+    valor: "120",
+    forma_pagamento: "pix",
+    status: "pendente",
+  });
+});
+
+test("criarAgendamento recusa quando o serviço tem preço mas a forma de pagamento não foi informada", async () => {
+  servicosService.listar.mockResolvedValueOnce([
+    { id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30, preco: "120" },
+  ]);
+
+  const resultado = await executarFerramenta(2, "criarAgendamento", {
+    nome_servico: "Sessão de Fisioterapia",
+    data_hora: "2026-01-10T10:00:00",
+  });
+
+  expect(resultado.erro).toContain("forma de pagamento");
+  expect(agendamentosService.criar).not.toHaveBeenCalled();
+  expect(pagamentosService.criar).not.toHaveBeenCalled();
+});
+
+test("criarAgendamento recusa forma de pagamento fora da lista aceita", async () => {
+  servicosService.listar.mockResolvedValueOnce([
+    { id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30, preco: "120" },
+  ]);
+
+  const resultado = await executarFerramenta(2, "criarAgendamento", {
+    nome_servico: "Sessão de Fisioterapia",
+    data_hora: "2026-01-10T10:00:00",
+    forma_pagamento: "boleto",
+  });
+
+  expect(resultado.erro).toContain("forma de pagamento");
+  expect(agendamentosService.criar).not.toHaveBeenCalled();
+});
+
+test("criarAgendamento não lança pagamento quando o serviço não tem preço definido", async () => {
+  servicosService.listar.mockResolvedValueOnce([
+    { id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30, preco: null },
+  ]);
+
+  await executarFerramenta(2, "criarAgendamento", {
+    nome_servico: "Sessão de Fisioterapia",
+    data_hora: "2026-01-10T10:00:00",
+  });
+
+  expect(pagamentosService.criar).not.toHaveBeenCalled();
+});
+
+test("criarAgendamento não falha o agendamento se o lançamento do pagamento pendente der erro", async () => {
+  servicosService.listar.mockResolvedValueOnce([
+    { id: 5, nome: "Sessão de Fisioterapia", duracao_minutos: 30, preco: "120" },
+  ]);
+  pagamentosService.criar.mockRejectedValueOnce(new Error("banco fora do ar"));
+
+  const resultado = await executarFerramenta(2, "criarAgendamento", {
+    nome_servico: "Sessão de Fisioterapia",
+    data_hora: "2026-01-10T10:00:00",
+    forma_pagamento: "dinheiro",
+  });
+
+  expect(resultado).toEqual(expect.objectContaining({ id: 1, status: "agendado" }));
+  expect(resultado.erro).toBeUndefined();
 });
 
 test("remarcarAgendamento resolve o agendamento certo pelo nome do serviço quando há mais de um ativo", async () => {

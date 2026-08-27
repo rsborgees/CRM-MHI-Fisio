@@ -46,6 +46,28 @@ export async function listar({ data, data_inicio, data_fim, profissional_id, cli
   });
 }
 
+// Pega agendamentos que começam dentro da janela [agora, agora + antecedenciaMinutos] — não um
+// horário fixo do dia. Rodar essa consulta com frequência (ver agendador.js) garante que cada
+// agendamento seja pego assim que entrar na janela, sem depender do cron cair num minuto exato.
+export async function listarParaLembrete(antecedenciaMinutos) {
+  const agora = new Date();
+  const limite = new Date(agora.getTime() + antecedenciaMinutos * 60 * 1000);
+
+  return prisma.agendamentos.findMany({
+    where: {
+      data_hora: { gte: agora, lte: limite },
+      status: { not: "cancelado" },
+      lembrete_enviado: false,
+    },
+    include: { clientes: true, servicos: true },
+    orderBy: { data_hora: "asc" },
+  });
+}
+
+export async function marcarLembreteEnviado(id) {
+  await prisma.agendamentos.update({ where: { id }, data: { lembrete_enviado: true } });
+}
+
 export async function buscarPorId(id) {
   return prisma.agendamentos.findUniqueOrThrow({
     where: { id },

@@ -60,6 +60,7 @@ function Agenda() {
   const [servicoId, setServicoId] = useState('')
   const [hora, setHora] = useState('')
   const [editandoId, setEditandoId] = useState(null)
+  const [erro, setErro] = useState('')
 
   const semana = diasDaSemana(segunda)
 
@@ -119,6 +120,8 @@ function Agenda() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    setErro('')
+
     const corpo = JSON.stringify({
       cliente_id: clienteId,
       profissional_id: profissionalId || undefined,
@@ -126,14 +129,18 @@ function Agenda() {
       data_hora: `${dataForm}T${hora}:00`,
     })
 
-    if (editandoId) {
-      await api(`/agendamentos/${editandoId}`, { method: 'PUT', body: corpo })
-    } else {
-      await api('/agendamentos', { method: 'POST', body: corpo })
-    }
+    try {
+      if (editandoId) {
+        await api(`/agendamentos/${editandoId}`, { method: 'PUT', body: corpo })
+      } else {
+        await api('/agendamentos', { method: 'POST', body: corpo })
+      }
 
-    limparFormulario()
-    carregarAgendamentos()
+      limparFormulario()
+      carregarAgendamentos()
+    } catch (erro) {
+      setErro(erro.message)
+    }
   }
 
   function handleEditar(agendamento) {
@@ -263,6 +270,7 @@ function Agenda() {
               Cancelar
             </button>
           )}
+          {erro && <p className="page-form-erro">{erro}</p>}
         </form>
       </div>
 

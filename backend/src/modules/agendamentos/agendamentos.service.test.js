@@ -20,7 +20,7 @@ jest.unstable_mockModule("../../lib/prisma.js", () => ({
   },
 }));
 
-const { criar, horariosDisponiveis } = await import("./agendamentos.service.js");
+const { criar, horariosDisponiveis, listarParaLembrete } = await import("./agendamentos.service.js");
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -76,4 +76,24 @@ test("horariosDisponiveis exclui horários já ocupados mesmo sem profissional i
 
   const ocupado = horarios.some((h) => new Date(h).toISOString() === new Date("2026-08-19T11:00:00.000-03:00").toISOString());
   expect(ocupado).toBe(false);
+});
+
+test("listarParaLembrete busca agendamentos ativos, sem lembrete enviado, dentro da janela de antecedência", async () => {
+  mockFindMany.mockResolvedValueOnce([]);
+
+  await listarParaLembrete(60);
+
+  expect(mockFindMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        status: { not: "cancelado" },
+        lembrete_enviado: false,
+        data_hora: expect.objectContaining({ gte: expect.any(Date), lte: expect.any(Date) }),
+      }),
+    }),
+  );
+
+  const { data_hora } = mockFindMany.mock.calls[0][0].where;
+  const diferencaMinutos = (data_hora.lte.getTime() - data_hora.gte.getTime()) / 60000;
+  expect(diferencaMinutos).toBeCloseTo(60, 1);
 });

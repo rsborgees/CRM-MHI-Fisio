@@ -14,7 +14,9 @@ export async function gerarResumoCliente(cliente) {
   );
 
   const partes = [
-    `Nome: ${cliente.nome}.`,
+    cliente.nome_confirmado
+      ? `Nome (já confirmado pelo próprio cliente em conversa anterior, não precisa perguntar de novo): ${cliente.nome}.`
+      : `Nome (ainda NÃO confirmado pelo cliente — é só o nome do perfil do WhatsApp, pode estar errado ou incompleto): ${cliente.nome}.`,
     `Status: ${cliente.status}.`,
     diasComoCliente > 0 ? `Cliente há ${diasComoCliente} dia(s).` : "Primeira interação com este contato.",
     `Total de agendamentos já feitos: ${agendamentos.length} (${cancelados} cancelado(s)).`,

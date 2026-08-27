@@ -2,6 +2,7 @@ import * as clientesService from "../clientes/clientes.service.js";
 import * as servicosService from "../servicos/servicos.service.js";
 import * as profissionaisService from "../profissionais/profissionais.service.js";
 import * as agendamentosService from "../agendamentos/agendamentos.service.js";
+import * as pagamentosService from "../pagamentos/pagamentos.service.js";
 import { AppError } from "../../utils/AppError.js";
 
 const DIAS_DA_SEMANA = [
@@ -16,6 +17,10 @@ const DIAS_DA_SEMANA = [
 
 const MAX_HORARIOS_SUGERIDOS = 2;
 const FUSO_HORARIO_CLINICA = "America/Sao_Paulo";
+const FORMAS_PAGAMENTO_VALIDAS = ["dinheiro", "pix", "cartao_credito", "cartao_debito"];
+// Pra agendamentos no mesmo dia, exige pelo menos esse intervalo a partir de agora — dá tempo
+// da clínica se organizar e evita a IA oferecer um horário daqui a 10 minutos.
+const ANTECEDENCIA_MINIMA_MESMO_DIA_MINUTOS = 120;
 
 // Converte um horário (armazenado em UTC no banco) pro fuso da clínica, explicitamente —
 // não depende do fuso configurado no servidor onde isso roda. Sem isso, a IA lê o número
@@ -35,6 +40,22 @@ function paraDataHoraLocalISO(dataUTC) {
   return `${valor("year")}-${valor("month")}-${valor("day")}T${valor("hour")}:${valor("minute")}:00`;
 }
 
+// "9h" ou "9h30" — nunca "09:00", que soa formal demais pra uma mensagem de WhatsApp.
+export function formatarHoraLocal(dataHoraUTC) {
+  const [hora, minuto] = paraDataHoraLocalISO(dataHoraUTC).slice(11, 16).split(":");
+  return minuto === "00" ? `${Number(hora)}h` : `${Number(hora)}h${minuto}`;
+}
+
+// "sexta-feira, 28/08" — pro cartão final de confirmação. Diferente de descreverDiaRelativo:
+// ali "amanhã" é natural numa conversa ao vivo, mas numa mensagem que o cliente pode reler
+// depois (é basicamente um comprovante) a data relativa fica ambígua — precisa do dia certo.
+export function formatarDataCompletaLocal(dataHoraUTC) {
+  const dataLocal = paraDataHoraLocalISO(dataHoraUTC).slice(0, 10);
+  const [, mes, dia] = dataLocal.split("-");
+  const diaSemana = DIAS_DA_SEMANA[new Date(`${dataLocal}T00:00:00`).getDay()];
+  return `${diaSemana}, ${dia}/${mes}`;
+}
+
 function proximoDiaUtilISO() {
   const data = new Date();
   data.setDate(data.getDate() + 1);
@@ -47,12 +68,17 @@ function proximoDiaUtilISO() {
   return `${ano}-${mes}-${dia}`;
 }
 
+// Usa o fuso da clínica explicitamente (mesma lógica de paraDataHoraLocalISO) em vez do fuso
+// local do servidor — sem isso, perto da meia-noite UTC a IA recebe a data errada (ex: servidor
+// já em "quinta" enquanto em São Paulo ainda é "quarta às 21h").
 function formatarDataAtual() {
-  const agora = new Date();
-  const ano = agora.getFullYear();
-  const mes = String(agora.getMonth() + 1).padStart(2, "0");
-  const dia = String(agora.getDate()).padStart(2, "0");
-  return `Hoje é ${DIAS_DA_SEMANA[agora.getDay()]}, ${ano}-${mes}-${dia} (formato AAAA-MM-DD). Use esta data como referência para calcular "hoje", "amanhã", "essa semana" e datas relativas semelhantes — nunca use outra data como hoje.`;
+  const [dataLocal, horaLocal] = paraDataHoraLocalISO(new Date()).split("T");
+  const diaSemana = DIAS_DA_SEMANA[new Date(`${dataLocal}T00:00:00`).getDay()];
+  return (
+    `Hoje é ${diaSemana}, ${dataLocal} (formato AAAA-MM-DD), agora são ${horaLocal.slice(0, 5)} ` +
+    `(horário de Brasília). Use esta data e hora como referência para calcular "hoje", "amanhã", ` +
+    '"essa semana", "daqui a pouco" e datas/horários relativos semelhantes — nunca use outra data ou hora como agora.'
+  );
 }
 
 export function gerarInstrucaoSistema({ instrucaoBase, resumoCliente, nome, primeiraMensagem }) {
@@ -143,6 +169,14 @@ export const DEFINICOES_FERRAMENTAS = [
             "a preferência do cliente.",
         },
         data_hora: { type: "string", description: "data e hora no formato AAAA-MM-DDTHH:mm:00" },
+        forma_pagamento: {
+          type: "string",
+          enum: ["dinheiro", "pix", "cartao_credito", "cartao_debito"],
+          description:
+            "forma de pagamento escolhida pelo cliente. Pergunte antes de agendar, se o serviço tiver preço e " +
+            "você ainda não sabe. Se o cliente disser algo como 'cartão' sem especificar, pergunte se é crédito " +
+            "ou débito.",
+        },
       },
       required: ["nome_servico", "data_hora"],
     },
@@ -287,6 +321,22 @@ function horaLocal(horarioUTC) {
   return Number(paraDataHoraLocalISO(horarioUTC).slice(11, 13));
 }
 
+// Se `data` for hoje (no fuso da clínica), remove horários antes do corte de antecedência
+// mínima. A hora atual é arredondada pra baixo antes de somar a margem — às 9h09, o corte
+// fica 11h00 (não 11h09), pra não descartar por poucos minutos um horário na hora cheia que
+// já cumpre a margem em espírito. Pra qualquer outro dia, não filtra nada.
+function comAntecedenciaMinimaSeHoje(horarios, data) {
+  const agoraLocalISO = paraDataHoraLocalISO(new Date());
+  const hojeLocal = agoraLocalISO.slice(0, 10);
+  if (data !== hojeLocal) return horarios;
+
+  const horaAtual = Number(agoraLocalISO.slice(11, 13));
+  const horaCorte = String(horaAtual + ANTECEDENCIA_MINIMA_MESMO_DIA_MINUTOS / 60).padStart(2, "0");
+  const limiteLocalISO = `${data}T${horaCorte}:00:00`;
+
+  return horarios.filter((horario) => paraDataHoraLocalISO(horario) >= limiteLocalISO);
+}
+
 async function consultarHorariosDisponiveis(clienteId, argumentos) {
   const servico = await resolverServicoPorNome(argumentos.nome_servico);
   const profissional = await resolverProfissionalPorNome(argumentos.nome_profissional);
@@ -294,11 +344,14 @@ async function consultarHorariosDisponiveis(clienteId, argumentos) {
   // ou deixar o modelo inventar uma data.
   const data = argumentos.data || proximoDiaUtilISO();
 
-  const todosHorarios = await agendamentosService.horariosDisponiveis({
-    servico_id: servico?.id,
-    profissional_id: profissional?.id,
+  const todosHorarios = comAntecedenciaMinimaSeHoje(
+    await agendamentosService.horariosDisponiveis({
+      servico_id: servico?.id,
+      profissional_id: profissional?.id,
+      data,
+    }),
     data,
-  });
+  );
 
   const filtroPeriodo = FILTROS_PERIODO_DIA[argumentos.periodo_dia];
   const horarios = filtroPeriodo ? todosHorarios.filter((horario) => filtroPeriodo(horaLocal(horario))) : todosHorarios;
@@ -346,6 +399,17 @@ async function criarAgendamento(clienteId, argumentos) {
 
   const servico = await resolverServicoPorNome(argumentos.nome_servico);
 
+  // Checado antes de criar qualquer coisa no banco — se faltar, é melhor a IA perguntar e
+  // tentar de novo do que criar o agendamento sem forma de pagamento definida (ou pior, criar
+  // duas vezes numa retentativa). Só exige quando o serviço realmente tem um valor a cobrar.
+  if (servico?.preco != null && !FORMAS_PAGAMENTO_VALIDAS.includes(argumentos.forma_pagamento)) {
+    throw new AppError(
+      "Antes de criar o agendamento, pergunte como o cliente prefere pagar (dinheiro, pix, cartão de crédito ou " +
+        "cartão de débito) e informe a forma de pagamento.",
+      400,
+    );
+  }
+
   let profissional;
   if (argumentos.nome_profissional) {
     profissional = await resolverProfissionalPorNome(argumentos.nome_profissional);
@@ -371,11 +435,31 @@ async function criarAgendamento(clienteId, argumentos) {
     duracao_minutos: servico?.duracao_minutos,
   });
 
+  // Lança o valor do serviço como pendente assim que o cliente agenda pela IA — fica visível
+  // no Financeiro pra cobrar depois. Só quando o serviço tem preço definido, e nunca deixa uma
+  // falha aqui derrubar o agendamento que já foi criado com sucesso (o cliente já foi avisado
+  // que agendou; tentar de novo criaria um agendamento duplicado).
+  if (servico?.preco != null) {
+    try {
+      await pagamentosService.criar({
+        cliente_id: clienteId,
+        agendamento_id: agendamento.id,
+        valor: servico.preco,
+        forma_pagamento: argumentos.forma_pagamento,
+        status: "pendente",
+      });
+    } catch (erro) {
+      console.error(`Falha ao lançar pagamento pendente do agendamento ${agendamento.id}:`, erro);
+    }
+  }
+
   return {
     id: agendamento.id,
     status: agendamento.status,
     data_hora: agendamento.data_hora,
     servico: servico?.nome ?? null,
+    preco: servico?.preco ?? null,
+    nome_cliente: cliente.nome,
   };
 }
 
