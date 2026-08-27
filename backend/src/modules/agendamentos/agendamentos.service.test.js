@@ -4,6 +4,7 @@ const mockFindMany = jest.fn();
 const mockCreate = jest.fn();
 const mockUpdateManyClientes = jest.fn();
 const mockServicoFindUniqueOrThrow = jest.fn();
+const mockServicoFindUnique = jest.fn();
 
 jest.unstable_mockModule("../../lib/prisma.js", () => ({
   prisma: {
@@ -16,6 +17,7 @@ jest.unstable_mockModule("../../lib/prisma.js", () => ({
     },
     servicos: {
       findUniqueOrThrow: mockServicoFindUniqueOrThrow,
+      findUnique: mockServicoFindUnique,
     },
   },
 }));
@@ -46,6 +48,40 @@ test("criar funciona normalmente quando não há conflito de horário", async ()
   await criar({ cliente_id: 2, servico_id: 5, data_hora: new Date("2026-08-19T12:00:00.000Z"), duracao_minutos: 30 });
 
   expect(mockCreate).toHaveBeenCalled();
+});
+
+test("criar busca a duração real do serviço quando duracao_minutos não é informado (ex: tela de Agenda)", async () => {
+  mockFindMany.mockResolvedValueOnce([]);
+  mockServicoFindUnique.mockResolvedValueOnce({ id: 5, duracao_minutos: 30 });
+
+  await criar({ cliente_id: 2, servico_id: 5, data_hora: new Date("2026-08-19T09:00:00.000-03:00") });
+
+  expect(mockServicoFindUnique).toHaveBeenCalledWith({ where: { id: 5 } });
+  expect(mockCreate).toHaveBeenCalledWith({
+    data: expect.objectContaining({ duracao_minutos: 30 }),
+  });
+});
+
+test("criar não bloqueia por engano quando o serviço real (30min) cabe antes do almoço, mesmo sem duracao_minutos informado (reproduz caso real: tela de Agenda sempre assumia 60min e bloqueava sem necessidade)", async () => {
+  mockFindMany.mockResolvedValueOnce([]);
+  mockServicoFindUnique.mockResolvedValueOnce({ id: 5, duracao_minutos: 30 });
+
+  // 11h15 + 30min real = termina 11h45, antes do almoço (12h-13h). Com o padrão errado de
+  // 60min, terminaria 12h15 e seria bloqueado à toa.
+  await criar({ cliente_id: 2, servico_id: 5, data_hora: new Date("2026-08-19T11:15:00.000-03:00") });
+
+  expect(mockCreate).toHaveBeenCalled();
+});
+
+test("criar usa o padrão de 60min pra checar conflito quando não há duracao_minutos nem servico_id", async () => {
+  mockFindMany.mockResolvedValueOnce([]);
+
+  // Sem servico_id pra consultar, cai no padrão de 60min — 11h30 + 60min invade o almoço.
+  await expect(
+    criar({ cliente_id: 2, data_hora: new Date("2026-08-19T11:30:00.000-03:00") }),
+  ).rejects.toThrow(/almoço/i);
+
+  expect(mockServicoFindUnique).not.toHaveBeenCalled();
 });
 
 test("criar recusa agendamento no horário de almoço (12h às 13h), mesmo sem nenhum outro agendamento conflitante", async () => {

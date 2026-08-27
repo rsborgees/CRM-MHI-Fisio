@@ -105,9 +105,22 @@ async function verificarConflito({ profissional_id, data_hora, duracao_minutos, 
   }
 }
 
+// Sem isso, um agendamento criado sem informar duracao_minutos (ex: pela tela de Agenda, que
+// não manda esse campo) cai no padrão de 60min pra checagem de conflito — mesmo que o serviço
+// escolhido dure só 30min. Isso já bloqueou por engano um horário de manhã que nem chegava
+// perto do almoço de verdade, só porque o padrão de 60min "invadia" o bloqueio.
+async function resolverDuracao(dados) {
+  if (dados.duracao_minutos != null || !dados.servico_id) return dados.duracao_minutos;
+  const servico = await prisma.servicos.findUnique({ where: { id: Number(dados.servico_id) } });
+  return servico?.duracao_minutos ?? dados.duracao_minutos;
+}
+
 export async function criar(dados) {
-  await verificarConflito(dados);
-  const agendamento = await prisma.agendamentos.create({ data: dados });
+  const duracao_minutos = await resolverDuracao(dados);
+  const dadosCompletos = { ...dados, duracao_minutos };
+
+  await verificarConflito(dadosCompletos);
+  const agendamento = await prisma.agendamentos.create({ data: dadosCompletos });
 
   // Primeiro agendamento de verdade promove o contato de "novo_contato" pra "ativo".
   await prisma.clientes.updateMany({
