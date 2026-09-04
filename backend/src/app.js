@@ -14,7 +14,9 @@ import pacotesRoutes from "./modules/pacotes/pacotes.routes.js";
 import agendamentosRoutes from "./modules/agendamentos/agendamentos.routes.js";
 import pagamentosRoutes from "./modules/pagamentos/pagamentos.routes.js";
 import historicoRoutes from "./modules/historico/historico.routes.js";
+import anamnesesRoutes from "./modules/anamneses/anamneses.routes.js";
 import avaliacoesRoutes from "./modules/avaliacoes/avaliacoes.routes.js";
+import evolucoesRoutes from "./modules/evolucoes/evolucoes.routes.js";
 import usuariosRoutes from "./modules/usuarios/usuarios.routes.js";
 
 import { requireAuth } from "./middlewares/auth.middleware.js";
@@ -42,7 +44,9 @@ app.use("/pacotes", requireAuth, pacotesRoutes);
 app.use("/agendamentos", requireAuth, agendamentosRoutes);
 app.use("/pagamentos", requireAuth, pagamentosRoutes);
 app.use("/historico", requireAuth, historicoRoutes);
+app.use("/anamneses", requireAuth, anamnesesRoutes);
 app.use("/avaliacoes", requireAuth, avaliacoesRoutes);
+app.use("/evolucoes", requireAuth, evolucoesRoutes);
 // Gerenciar contas de outras pessoas (papel, senha, exclusão) é exclusivo de administrador.
 app.use("/usuarios", requireAuth, requireRole("administrador"), usuariosRoutes);
 

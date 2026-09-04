@@ -26,10 +26,37 @@ model agendamentos {
   pacotes            pacotes?       @relation(fields: [pacote_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   profissionais      profissionais? @relation(fields: [profissional_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   servicos           servicos?      @relation(fields: [servico_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  anamneses          anamneses[]
   avaliacoes         avaliacoes[]
+  evolucoes          evolucoes[]
   pagamentos         pagamentos[]
 }
 
+// Entrevista de saúde inicial do paciente, feita antes do exame físico.
+model anamneses {
+  id                       Int            @id @default(autoincrement())
+  cliente_id               Int
+  agendamento_id           Int?
+  data                     DateTime       @default(now()) @db.Timestamp(6)
+  queixa_principal         String?
+  historico_doenca_atual   String?
+  doencas_previas          String?
+  cirurgias_anteriores     String?
+  medicamentos_em_uso      String?
+  alergias                 String?        @db.VarChar(255)
+  historico_familiar       String?
+  pratica_atividade_fisica Boolean?
+  tabagismo                String?        @db.VarChar(30)
+  consumo_alcool           String?        @db.VarChar(30)
+  qualidade_sono           String?        @db.VarChar(20)
+  observacoes_adicionais   String?
+  responsavel_id           Int?
+  agendamentos             agendamentos?  @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                 clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profissionais            profissionais? @relation(fields: [responsavel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// Exame físico do paciente — postura, força, amplitude de movimento etc.
 model avaliacoes {
   id                           Int            @id @default(autoincrement())
   cliente_id                   Int
@@ -38,7 +65,6 @@ model avaliacoes {
   peso                         Decimal?       @db.Decimal(6, 2)
   altura                       Decimal?       @db.Decimal(6, 2)
   imc                          Decimal?       @db.Decimal(6, 2)
-  medidas                      Json?
   queixa_principal             String?
   diagnostico_fisioterapeutico String?
   escala_dor                   Int?           @db.SmallInt
@@ -48,6 +74,23 @@ model avaliacoes {
   agendamentos                 agendamentos?  @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   clientes                     clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   profissionais                profissionais? @relation(fields: [responsavel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// Acompanhamento de uma sessão de fisioterapia já realizada — sempre vinculada a um agendamento.
+model evolucoes {
+  id                  Int            @id @default(autoincrement())
+  cliente_id          Int
+  agendamento_id      Int
+  data                DateTime       @default(now()) @db.Timestamp(6)
+  evolucao_quadro     String?
+  escala_dor          Int?           @db.SmallInt
+  conduta_realizada   String?
+  resposta_tratamento String?        @db.VarChar(20)
+  observacoes         String?
+  responsavel_id      Int?
+  agendamentos        agendamentos   @relation(fields: [agendamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes            clientes       @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profissionais       profissionais? @relation(fields: [responsavel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model clientes {
@@ -71,7 +114,9 @@ model clientes {
   // o nome pode vir preenchido com o pushName do WhatsApp sem nunca ter sido confirmado por ele.
   nome_confirmado    Boolean              @default(false)
   agendamentos       agendamentos[]
+  anamneses          anamneses[]
   avaliacoes         avaliacoes[]
+  evolucoes          evolucoes[]
   conversas_whatsapp conversas_whatsapp[]
   historico_clientes historico_clientes[]
   pagamentos         pagamentos[]
@@ -139,7 +184,9 @@ model profissionais {
   observacoes       String?
   ativo             Boolean?       @default(true)
   agendamentos      agendamentos[]
+  anamneses         anamneses[]
   avaliacoes        avaliacoes[]
+  evolucoes         evolucoes[]
   servicosAtendidos servicos[]     @relation("ProfissionalServicos")
 }
 
@@ -156,13 +203,13 @@ model usuarios {
 }
 
 model servicos {
-  id                       Int             @id @default(autoincrement())
-  nome                     String          @db.VarChar(150)
-  descricao                String?
-  duracao_minutos          Int?
-  preco                    Decimal?        @db.Decimal(12, 2)
-  categoria                String?         @db.VarChar(100)
-  ativo                    Boolean?        @default(true)
-  agendamentos             agendamentos[]
-  profissionaisQueAtendem  profissionais[] @relation("ProfissionalServicos")
+  id                      Int             @id @default(autoincrement())
+  nome                    String          @db.VarChar(150)
+  descricao               String?
+  duracao_minutos         Int?
+  preco                   Decimal?        @db.Decimal(12, 2)
+  categoria               String?         @db.VarChar(100)
+  ativo                   Boolean?        @default(true)
+  agendamentos            agendamentos[]
+  profissionaisQueAtendem profissionais[] @relation("ProfissionalServicos")
 }

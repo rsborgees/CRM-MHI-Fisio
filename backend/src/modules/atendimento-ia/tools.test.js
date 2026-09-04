@@ -487,6 +487,37 @@ test("atualizarNomeCliente salva o nome informado pelo cliente da conversa e mar
   expect(clientesService.atualizar).toHaveBeenCalledWith(2, { nome: "Maria Silva", nome_confirmado: true });
   expect(resultado).toEqual({ id: 2, nome: "Maria Silva" });
 });
+  
+test("atualizarDadosCliente salva só os campos cadastrais informados pelo cliente", async () => {
+  clientesService.atualizar.mockResolvedValueOnce({
+    id: 2,
+    cpf_cnpj: "123.456.789-00",
+    data_nascimento: new Date("1990-05-20"),
+    email: "maria@example.com",
+    endereco: null,
+    cidade: null,
+    estado: null,
+    cep: null,
+  });
+
+  const resultado = await executarFerramenta(2, "atualizarDadosCliente", {
+    cpf: "123.456.789-00",
+    data_nascimento: "1990-05-20",
+    email: "maria@example.com",
+  });
+
+  expect(clientesService.atualizar).toHaveBeenCalledWith(2, {
+    cpf_cnpj: "123.456.789-00",
+    data_nascimento: new Date("1990-05-20"),
+    email: "maria@example.com",
+    endereco: undefined,
+    cidade: undefined,
+    estado: undefined,
+    cep: undefined,
+  });
+  expect(resultado.cpf).toBe("123.456.789-00");
+  expect(resultado.email).toBe("maria@example.com");
+});
 
 test("executarFerramenta devolve erro genérico (não estoura) quando o serviço interno lança um erro que não é AppError", async () => {
   agendamentosService.horariosDisponiveis.mockRejectedValueOnce(new Error("registro não encontrado no banco"));

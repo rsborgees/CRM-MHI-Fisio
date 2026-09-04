@@ -98,6 +98,14 @@ export function gerarInstrucaoSistema({ instrucaoBase, resumoCliente, nome, prim
       "atualizarNomeCliente pra salvar no cadastro — não pergunte de novo depois disso.";
   }
 
+  instrucao +=
+    " Além do nome, o cadastro do cliente também guarda CPF, endereço completo, email e data de nascimento — o " +
+    "resumo do cliente acima já informa quais desses dados faltam. Complete o que estiver faltando aos poucos, " +
+    "num momento natural da conversa (por exemplo ao confirmar um agendamento, ou quando o assunto vier a calhar), " +
+    "sem parecer um formulário: nunca pergunte tudo de uma vez, peça um ou dois desses dados por vez. Assim que o " +
+    "cliente informar qualquer um deles (mesmo espontaneamente, sem você ter perguntado), chame a ferramenta " +
+    "atualizarDadosCliente imediatamente pra salvar — não espere ter todos pra chamar a ferramenta.";
+
   return instrucao;
 }
 
@@ -231,6 +239,25 @@ export const DEFINICOES_FERRAMENTAS = [
         nome: { type: "string", description: "nome completo informado pelo cliente" },
       },
       required: ["nome"],
+    },
+  },
+  {
+    nome: "atualizarDadosCliente",
+    descricao:
+      "Salva dados cadastrais do cliente desta conversa (CPF, endereço, email, data de nascimento) assim que ele " +
+      "informar qualquer um deles. Envie só os campos que o cliente de fato informou nesta chamada — não invente " +
+      "nem repita valores que ele não disse.",
+    parametros: {
+      type: "object",
+      properties: {
+        cpf: { type: "string", description: "CPF informado pelo cliente" },
+        data_nascimento: { type: "string", description: "data de nascimento informada, no formato AAAA-MM-DD" },
+        email: { type: "string", description: "email informado pelo cliente" },
+        endereco: { type: "string", description: "endereço informado (rua, número, complemento e bairro)" },
+        cidade: { type: "string", description: "cidade informada" },
+        estado: { type: "string", description: "estado informado (UF ou nome)" },
+        cep: { type: "string", description: "CEP informado" },
+      },
     },
   },
 ];
@@ -544,6 +571,28 @@ async function atualizarNomeCliente(clienteId, argumentos) {
   return { id: cliente.id, nome: cliente.nome };
 }
 
+async function atualizarDadosCliente(clienteId, argumentos) {
+  const cliente = await clientesService.atualizar(clienteId, {
+    cpf_cnpj: argumentos.cpf,
+    data_nascimento: argumentos.data_nascimento ? new Date(argumentos.data_nascimento) : undefined,
+    email: argumentos.email,
+    endereco: argumentos.endereco,
+    cidade: argumentos.cidade,
+    estado: argumentos.estado,
+    cep: argumentos.cep,
+  });
+  return {
+    id: cliente.id,
+    cpf: cliente.cpf_cnpj,
+    data_nascimento: cliente.data_nascimento,
+    email: cliente.email,
+    endereco: cliente.endereco,
+    cidade: cliente.cidade,
+    estado: cliente.estado,
+    cep: cliente.cep,
+  };
+}
+
 const EXECUTORES = {
   consultarServicosPrecos,
   consultarHorariosDisponiveis,
@@ -552,6 +601,7 @@ const EXECUTORES = {
   cancelarAgendamento,
   consultarMeusAgendamentos,
   atualizarNomeCliente,
+  atualizarDadosCliente,
 };
 
 export async function executarFerramenta(clienteId, nome, argumentos) {

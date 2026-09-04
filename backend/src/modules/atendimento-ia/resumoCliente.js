@@ -1,5 +1,22 @@
 import * as agendamentosService from "../agendamentos/agendamentos.service.js";
 
+const CAMPOS_CADASTRAIS = [
+  { chave: "cpf_cnpj", rotulo: "CPF" },
+  { chave: "data_nascimento", rotulo: "data de nascimento" },
+  { chave: "email", rotulo: "email" },
+  { chave: "endereco", rotulo: "endereço" },
+];
+
+// Calculado aqui (não deixado pra IA "lembrar" sozinha ao longo da conversa) — assim ela sempre
+// sabe com certeza o que já está preenchido, mesmo numa conversa retomada dias depois.
+function resumoCadastro(cliente) {
+  const faltando = CAMPOS_CADASTRAIS.filter((campo) => !cliente[campo.chave]).map((campo) => campo.rotulo);
+  if (faltando.length === 0) {
+    return "Cadastro completo (CPF, data de nascimento, email e endereço já preenchidos) — não precisa pedir esses dados de novo.";
+  }
+  return `Dados cadastrais ainda faltando: ${faltando.join(", ")}.`;
+}
+
 export async function gerarResumoCliente(cliente) {
   const agendamentos = await agendamentosService.listar({ cliente_id: cliente.id });
 
@@ -23,6 +40,7 @@ export async function gerarResumoCliente(cliente) {
     futuro
       ? `Já tem um agendamento futuro marcado para ${new Date(futuro.data_hora).toLocaleString("pt-BR")}.`
       : "Não tem nenhum agendamento futuro marcado.",
+    resumoCadastro(cliente),
   ];
 
   return partes.join(" ");

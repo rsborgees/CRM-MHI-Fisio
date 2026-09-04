@@ -9,6 +9,13 @@ function Clientes() {
   const [carregando, setCarregando] = useState(true)
   const [nome, setNome] = useState('')
   const [celular, setCelular] = useState('')
+  const [cpfCnpj, setCpfCnpj] = useState('')
+  const [dataNascimento, setDataNascimento] = useState('')
+  const [email, setEmail] = useState('')
+  const [endereco, setEndereco] = useState('')
+  const [cidade, setCidade] = useState('')
+  const [estado, setEstado] = useState('')
+  const [cep, setCep] = useState('')
   const [editandoId, setEditandoId] = useState(null)
 
   async function carregarClientes() {
@@ -24,22 +31,34 @@ function Clientes() {
   function limparFormulario() {
     setNome('')
     setCelular('')
+    setCpfCnpj('')
+    setDataNascimento('')
+    setEmail('')
+    setEndereco('')
+    setCidade('')
+    setEstado('')
+    setCep('')
     setEditandoId(null)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
+    const dados = {
+      nome,
+      celular,
+      cpf_cnpj: cpfCnpj,
+      data_nascimento: dataNascimento || undefined,
+      email,
+      endereco,
+      cidade,
+      estado,
+      cep,
+    }
 
     if (editandoId) {
-      await api(`/clientes/${editandoId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ nome, celular }),
-      })
+      await api(`/clientes/${editandoId}`, { method: 'PUT', body: JSON.stringify(dados) })
     } else {
-      await api('/clientes', {
-        method: 'POST',
-        body: JSON.stringify({ nome, celular }),
-      })
+      await api('/clientes', { method: 'POST', body: JSON.stringify(dados) })
     }
 
     limparFormulario()
@@ -50,6 +69,13 @@ function Clientes() {
     setEditandoId(cliente.id)
     setNome(cliente.nome)
     setCelular(cliente.celular ?? '')
+    setCpfCnpj(cliente.cpf_cnpj ?? '')
+    setDataNascimento(cliente.data_nascimento ? cliente.data_nascimento.slice(0, 10) : '')
+    setEmail(cliente.email ?? '')
+    setEndereco(cliente.endereco ?? '')
+    setCidade(cliente.cidade ?? '')
+    setEstado(cliente.estado ?? '')
+    setCep(cliente.cep ?? '')
   }
 
   async function handleExcluir(cliente) {
@@ -91,6 +117,67 @@ function Clientes() {
               value={celular}
               onChange={(e) => setCelular(e.target.value)}
             />
+          </div>
+          <div className="page-field">
+            <label htmlFor="cliente-email">Email</label>
+            <input
+              id="cliente-email"
+              type="email"
+              className="input-field"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="page-field">
+            <label htmlFor="cliente-cpf">CPF/CNPJ</label>
+            <input
+              id="cliente-cpf"
+              className="input-field"
+              value={cpfCnpj}
+              onChange={(e) => setCpfCnpj(e.target.value)}
+            />
+          </div>
+          <div className="page-field">
+            <label htmlFor="cliente-nascimento">Data de nascimento</label>
+            <input
+              id="cliente-nascimento"
+              type="date"
+              className="input-field"
+              value={dataNascimento}
+              onChange={(e) => setDataNascimento(e.target.value)}
+            />
+          </div>
+          <div className="page-field page-field-full">
+            <label htmlFor="cliente-endereco">Endereço</label>
+            <input
+              id="cliente-endereco"
+              className="input-field"
+              placeholder="Rua, número, complemento e bairro"
+              value={endereco}
+              onChange={(e) => setEndereco(e.target.value)}
+            />
+          </div>
+          <div className="page-field">
+            <label htmlFor="cliente-cidade">Cidade</label>
+            <input
+              id="cliente-cidade"
+              className="input-field"
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
+            />
+          </div>
+          <div className="page-field">
+            <label htmlFor="cliente-estado">Estado</label>
+            <input
+              id="cliente-estado"
+              className="input-field"
+              value={estado}
+              onChange={(e) => setEstado(e.target.value)}
+            />
+          </div>
+          <div className="page-field">
+            <label htmlFor="cliente-cep">CEP</label>
+            <input id="cliente-cep" className="input-field" value={cep} onChange={(e) => setCep(e.target.value)} />
           </div>
           <button type="submit" className="btn-primary">
             {editandoId ? 'Salvar alterações' : 'Cadastrar'}

@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:3333'
+export const BASE_URL = 'http://localhost:3336'
 
 // Lê o papel/nome/email direto do token, sem outra chamada à API — o backend já embute isso no
 // JWT no login. É só pra decisões de exibição no front (esconder telas); a permissão de verdade

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BASE_URL } from '../api'
 import './Login.css'
 
 function Login() {
@@ -12,7 +13,7 @@ function Login() {
     e.preventDefault()
     setErro('')
 
-    const resposta = await fetch('http://localhost:3333/auth/login', {
+    const resposta = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, senha }),

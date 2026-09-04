@@ -3,7 +3,9 @@ import { jest } from "@jest/globals";
 const mockAgendamentosFindMany = jest.fn();
 const mockAgendamentosDeleteMany = jest.fn();
 const mockPagamentosDeleteMany = jest.fn();
+const mockAnamnesesDeleteMany = jest.fn();
 const mockAvaliacoesDeleteMany = jest.fn();
+const mockEvolucoesDeleteMany = jest.fn();
 const mockHistoricoDeleteMany = jest.fn();
 const mockConversasDeleteMany = jest.fn();
 const mockClientesDelete = jest.fn();
@@ -11,7 +13,9 @@ const mockClientesDelete = jest.fn();
 const tx = {
   agendamentos: { findMany: mockAgendamentosFindMany, deleteMany: mockAgendamentosDeleteMany },
   pagamentos: { deleteMany: mockPagamentosDeleteMany },
+  anamneses: { deleteMany: mockAnamnesesDeleteMany },
   avaliacoes: { deleteMany: mockAvaliacoesDeleteMany },
+  evolucoes: { deleteMany: mockEvolucoesDeleteMany },
   historico_clientes: { deleteMany: mockHistoricoDeleteMany },
   conversas_whatsapp: { deleteMany: mockConversasDeleteMany },
   clientes: { delete: mockClientesDelete },
@@ -30,7 +34,7 @@ beforeEach(() => {
   mockAgendamentosFindMany.mockResolvedValue([]);
 });
 
-test("ao excluir um cliente, remove em cascata pagamentos, avaliações, histórico, conversas e agendamentos antes do cliente", async () => {
+test("ao excluir um cliente, remove em cascata pagamentos, anamneses, avaliações, evoluções, histórico, conversas e agendamentos antes do cliente", async () => {
   mockAgendamentosFindMany.mockResolvedValueOnce([{ id: 10 }, { id: 11 }]);
 
   await remover(5);
@@ -38,7 +42,13 @@ test("ao excluir um cliente, remove em cascata pagamentos, avaliações, histór
   expect(mockPagamentosDeleteMany).toHaveBeenCalledWith({
     where: { OR: [{ cliente_id: 5 }, { agendamento_id: { in: [10, 11] } }] },
   });
+  expect(mockAnamnesesDeleteMany).toHaveBeenCalledWith({
+    where: { OR: [{ cliente_id: 5 }, { agendamento_id: { in: [10, 11] } }] },
+  });
   expect(mockAvaliacoesDeleteMany).toHaveBeenCalledWith({
+    where: { OR: [{ cliente_id: 5 }, { agendamento_id: { in: [10, 11] } }] },
+  });
+  expect(mockEvolucoesDeleteMany).toHaveBeenCalledWith({
     where: { OR: [{ cliente_id: 5 }, { agendamento_id: { in: [10, 11] } }] },
   });
   expect(mockHistoricoDeleteMany).toHaveBeenCalledWith({ where: { cliente_id: 5 } });
@@ -47,7 +57,7 @@ test("ao excluir um cliente, remove em cascata pagamentos, avaliações, histór
   expect(mockClientesDelete).toHaveBeenCalledWith({ where: { id: 5 } });
 });
 
-test("ao excluir um cliente sem nenhum agendamento, ainda remove pagamentos/avaliações vinculados só pelo cliente_id", async () => {
+test("ao excluir um cliente sem nenhum agendamento, ainda remove pagamentos/anamneses/avaliações/evoluções vinculados só pelo cliente_id", async () => {
   mockAgendamentosFindMany.mockResolvedValueOnce([]);
 
   await remover(7);
